@@ -1,6 +1,7 @@
 import { useMemo, useState, type FormEvent } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
 import { useApp } from '../context/useApp'
+import { DemoBusinessSwitcher } from '../components/demo/DemoBusinessSwitcher'
 import { MoneyInput } from '../components/ui/MoneyInput'
 import { businessProfileSchema } from '../lib/validation'
 import {
@@ -95,6 +96,20 @@ export function OnboardingPage() {
           Tell us about your shop once. Then do a short Daily Cash Check-in and
           we will show if money may run short.
         </p>
+
+        <section className="mt-6 rounded-lg border border-watch bg-watch-bg p-4">
+          <h2 className="font-semibold text-navy">Try Demo Mode</h2>
+          <p className="mt-1 text-sm text-muted">
+            Load one of six demonstration shops. This replaces any saved books in
+            this browser. Reset Demo Data is in Settings.
+          </p>
+          <div className="mt-3">
+            <DemoBusinessSwitcher
+              variant="full"
+              onLoaded={() => navigate('/', { replace: true })}
+            />
+          </div>
+        </section>
 
         <form
           onSubmit={onSubmit}
@@ -242,7 +257,7 @@ export function OnboardingPage() {
 
           <button
             type="submit"
-            className="w-full rounded-md bg-navy px-4 py-3 font-semibold text-white"
+            className="w-full rounded-md bg-bank-blue px-4 py-3 font-semibold text-white"
           >
             Save and open dashboard
           </button>

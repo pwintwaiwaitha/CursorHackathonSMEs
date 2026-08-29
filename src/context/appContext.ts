@@ -6,6 +6,7 @@ import type {
   ReceivableInput,
   ScheduledItemInput,
 } from '../lib/validation'
+import type { DemoBusinessId } from '../storage/demoMode'
 import type { AppStore } from '../storage/types'
 import type {
   Payable,
@@ -15,8 +16,12 @@ import type {
 
 export interface AppContextValue {
   store: AppStore
+  isReady: boolean
+  loadError: string | null
+  retryLoad: () => void
   saveProfile: (input: BusinessProfileInput) => void
   saveCheckIn: (input: DailyCheckInInput) => void
+  deleteCheckIn: (id: string) => void
   addScheduledItem: (input: ScheduledItemInput) => void
   removeScheduledItem: (id: string) => void
   addReceivable: (input: ReceivableInput) => void
@@ -26,6 +31,10 @@ export interface AppContextValue {
   updatePayable: (item: Payable) => void
   removePayable: (id: string) => void
   saveScenarios: (scenarios: ScenarioAssumptions) => void
+  isDemoMode: boolean
+  selectedDemoId: DemoBusinessId | null
+  loadDemoBusiness: (id: DemoBusinessId) => void
+  resetDemoData: () => void
   loadSampleData: () => void
   resetAllData: () => void
 }

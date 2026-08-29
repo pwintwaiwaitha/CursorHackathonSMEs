@@ -1,16 +1,17 @@
 import { useState, type FormEvent } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
+import { DemoBusinessSwitcher } from '../components/demo/DemoBusinessSwitcher'
 import { MoneyInput } from '../components/ui/MoneyInput'
 import { PageHeader } from '../components/ui/PageHeader'
 import { useApp } from '../context/useApp'
 import { formatDisplayDate, todayIsoDate } from '../lib/dates'
 import { formatMmk } from '../lib/money'
 import {
-  businessProfileSchema,
-  payableSchema,
-  receivableSchema,
-  scheduledItemSchema,
-} from '../lib/validation'
+  canUseBrowserNotifications,
+  enableBrowserNotifications,
+} from '../lib/notifications'
+import { loadNotificationPrefs, saveNotificationPrefs } from '../lib/uiStorage'
+import { businessProfileSchema, scheduledItemSchema } from '../lib/validation'
 import {
   BUSINESS_TYPE_LABELS,
   BUSINESS_TYPES,
@@ -28,18 +29,16 @@ export function SettingsPage() {
     saveProfile,
     addScheduledItem,
     removeScheduledItem,
-    addReceivable,
-    updateReceivable,
-    removeReceivable,
-    addPayable,
-    updatePayable,
-    removePayable,
-    loadSampleData,
+    selectedDemoId,
+    loadDemoBusiness,
+    resetDemoData,
     resetAllData,
   } = useApp()
   const navigate = useNavigate()
   const profile = store.profile
   const [profileMessage, setProfileMessage] = useState('')
+  const [notifPrefs, setNotifPrefs] = useState(loadNotificationPrefs)
+  const [notifMessage, setNotifMessage] = useState('')
 
   const [schedule, setSchedule] = useState({
     name: '',
@@ -47,20 +46,6 @@ export function SettingsPage() {
     amountMmk: 0,
     dueDate: todayIsoDate(),
     recurrence: 'monthly' as Recurrence,
-    notes: '',
-  })
-  const [receivable, setReceivable] = useState({
-    customerName: '',
-    amountMmk: 0,
-    dueDate: todayIsoDate(),
-    expectedCollectDate: todayIsoDate(),
-    notes: '',
-  })
-  const [payable, setPayable] = useState({
-    supplierName: '',
-    amountMmk: 0,
-    dueDate: todayIsoDate(),
-    expectedPayDate: todayIsoDate(),
     notes: '',
   })
   const [formError, setFormError] = useState('')
@@ -98,6 +83,48 @@ export function SettingsPage() {
         title="Settings"
         subtitle="Edit the shop profile, bills, customer credit and supplier credit."
       />
+
+      <section className="rounded-lg border border-line bg-white p-4">
+        <h2 className="font-semibold text-navy">Daily reminder</h2>
+        <p className="mt-2 text-base text-muted">
+          We only alert for overdue payments, upcoming bills, cash risks, and a missing
+          today’s record. Each type is shown once per day.
+        </p>
+        <label className="mt-4 block max-w-xs">
+          <span className="mb-1 block text-base font-medium">Reminder time</span>
+          <input
+            type="time"
+            className="min-h-11 w-full rounded-md border border-line px-3"
+            value={notifPrefs.reminderTime}
+            onChange={(event) => {
+              const next = { ...notifPrefs, reminderTime: event.target.value }
+              setNotifPrefs(next)
+              saveNotificationPrefs(next)
+            }}
+          />
+        </label>
+        <button
+          type="button"
+          className="mt-3 inline-flex min-h-11 items-center rounded-md bg-bank-blue-light px-4 font-semibold text-navy"
+          onClick={() => {
+            void enableBrowserNotifications().then((ok) => {
+              const next = { ...notifPrefs, browserEnabled: ok }
+              setNotifPrefs(next)
+              saveNotificationPrefs(next)
+              setNotifMessage(
+                ok
+                  ? 'Phone alerts are on. Saved on this phone.'
+                  : canUseBrowserNotifications()
+                    ? 'Phone alerts were not allowed. In-app alerts still work.'
+                    : 'This browser cannot send phone alerts. In-app alerts still work.',
+              )
+            })
+          }}
+        >
+          {notifPrefs.browserEnabled ? 'Phone alerts on' : 'Turn on phone alerts'}
+        </button>
+        {notifMessage ? <p className="mt-2 text-base text-healthy">{notifMessage}</p> : null}
+      </section>
 
       <section className="rounded-lg border border-line bg-white p-4">
         <h2 className="font-semibold text-navy">Business profile</h2>
@@ -188,7 +215,7 @@ export function SettingsPage() {
           <p className="text-sm text-muted md:col-span-2">Currency: MMK (fixed)</p>
           <button
             type="submit"
-            className="rounded-md bg-navy px-4 py-2 font-semibold text-white"
+            className="rounded-md bg-bank-blue px-4 py-2 font-semibold text-white"
           >
             Save profile
           </button>
@@ -286,10 +313,11 @@ export function SettingsPage() {
           </label>
           <button
             type="submit"
-            className="rounded-md bg-navy px-4 py-2 font-semibold text-white"
+            className="rounded-md bg-bank-blue px-4 py-2 font-semibold text-white"
           >
             Add scheduled item
           </button>
+          {formError ? <p className="text-sm text-risk">{formError}</p> : null}
         </form>
         <ul className="mt-4 divide-y divide-line">
           {store.scheduledItems.map((item) => (
@@ -316,245 +344,46 @@ export function SettingsPage() {
       </section>
 
       <section className="rounded-lg border border-line bg-white p-4">
-        <h2 className="font-semibold text-navy">Customer money coming in</h2>
-        <form
-          className="mt-4 grid gap-3 md:grid-cols-2"
-          onSubmit={(event) => {
-            event.preventDefault()
-            const parsed = receivableSchema.safeParse(receivable)
-            if (!parsed.success) {
-              setFormError(parsed.error.issues[0]?.message ?? 'Check customer bill.')
-              return
-            }
-            addReceivable(parsed.data)
-            setReceivable({
-              customerName: '',
-              amountMmk: 0,
-              dueDate: todayIsoDate(),
-              expectedCollectDate: todayIsoDate(),
-              notes: '',
-            })
-            setFormError('')
-          }}
-        >
-          <label className="block md:col-span-2">
-            <span className="mb-1 block text-sm font-medium">Customer name</span>
-            <input
-              className="w-full rounded-md border border-line px-3 py-2"
-              value={receivable.customerName}
-              onChange={(event) =>
-                setReceivable((current) => ({
-                  ...current,
-                  customerName: event.target.value,
-                }))
-              }
-            />
-          </label>
-          <MoneyInput
-            id="recv-amount"
-            label="Amount"
-            value={receivable.amountMmk}
-            onChange={(amountMmk) =>
-              setReceivable((current) => ({ ...current, amountMmk }))
-            }
-          />
-          <label className="block">
-            <span className="mb-1 block text-sm font-medium">Due date</span>
-            <input
-              type="date"
-              className="w-full rounded-md border border-line px-3 py-2"
-              value={receivable.dueDate}
-              onChange={(event) =>
-                setReceivable((current) => ({
-                  ...current,
-                  dueDate: event.target.value,
-                }))
-              }
-            />
-          </label>
-          <label className="block md:col-span-2">
-            <span className="mb-1 block text-sm font-medium">
-              When you expect to collect
-            </span>
-            <input
-              type="date"
-              className="w-full rounded-md border border-line px-3 py-2"
-              value={receivable.expectedCollectDate}
-              onChange={(event) =>
-                setReceivable((current) => ({
-                  ...current,
-                  expectedCollectDate: event.target.value,
-                }))
-              }
-            />
-          </label>
-          <button
-            type="submit"
-            className="rounded-md bg-navy px-4 py-2 font-semibold text-white"
-          >
-            Add customer bill
-          </button>
-        </form>
-        <ul className="mt-4 divide-y divide-line">
-          {store.receivables.map((item) => (
-            <li key={item.id} className="flex flex-wrap items-center justify-between gap-3 py-3 text-sm">
-              <div>
-                <p className="font-medium">
-                  {item.customerName} · {formatMmk(item.amountMmk)}
-                </p>
-                <p className="text-muted">
-                  {item.status} · collect {formatDisplayDate(item.expectedCollectDate)}
-                </p>
-              </div>
-              <div className="flex gap-3">
-                {item.status !== 'collected' ? (
-                  <button
-                    type="button"
-                    className="text-healthy"
-                    onClick={() => updateReceivable({ ...item, status: 'collected' })}
-                  >
-                    Mark collected
-                  </button>
-                ) : null}
-                <button
-                  type="button"
-                  className="text-risk"
-                  onClick={() => removeReceivable(item.id)}
-                >
-                  Remove
-                </button>
-              </div>
-            </li>
-          ))}
-        </ul>
-      </section>
-
-      <section className="rounded-lg border border-line bg-white p-4">
-        <h2 className="font-semibold text-navy">Supplier money going out</h2>
-        <form
-          className="mt-4 grid gap-3 md:grid-cols-2"
-          onSubmit={(event) => {
-            event.preventDefault()
-            const parsed = payableSchema.safeParse(payable)
-            if (!parsed.success) {
-              setFormError(parsed.error.issues[0]?.message ?? 'Check supplier bill.')
-              return
-            }
-            addPayable(parsed.data)
-            setPayable({
-              supplierName: '',
-              amountMmk: 0,
-              dueDate: todayIsoDate(),
-              expectedPayDate: todayIsoDate(),
-              notes: '',
-            })
-            setFormError('')
-          }}
-        >
-          <label className="block md:col-span-2">
-            <span className="mb-1 block text-sm font-medium">Supplier name</span>
-            <input
-              className="w-full rounded-md border border-line px-3 py-2"
-              value={payable.supplierName}
-              onChange={(event) =>
-                setPayable((current) => ({
-                  ...current,
-                  supplierName: event.target.value,
-                }))
-              }
-            />
-          </label>
-          <MoneyInput
-            id="pay-amount"
-            label="Amount"
-            value={payable.amountMmk}
-            onChange={(amountMmk) =>
-              setPayable((current) => ({ ...current, amountMmk }))
-            }
-          />
-          <label className="block">
-            <span className="mb-1 block text-sm font-medium">Due date</span>
-            <input
-              type="date"
-              className="w-full rounded-md border border-line px-3 py-2"
-              value={payable.dueDate}
-              onChange={(event) =>
-                setPayable((current) => ({ ...current, dueDate: event.target.value }))
-              }
-            />
-          </label>
-          <label className="block md:col-span-2">
-            <span className="mb-1 block text-sm font-medium">When you will pay</span>
-            <input
-              type="date"
-              className="w-full rounded-md border border-line px-3 py-2"
-              value={payable.expectedPayDate}
-              onChange={(event) =>
-                setPayable((current) => ({
-                  ...current,
-                  expectedPayDate: event.target.value,
-                }))
-              }
-            />
-          </label>
-          <button
-            type="submit"
-            className="rounded-md bg-navy px-4 py-2 font-semibold text-white"
-          >
-            Add supplier bill
-          </button>
-        </form>
-        {formError ? <p className="mt-2 text-sm text-risk">{formError}</p> : null}
-        <ul className="mt-4 divide-y divide-line">
-          {store.payables.map((item) => (
-            <li key={item.id} className="flex flex-wrap items-center justify-between gap-3 py-3 text-sm">
-              <div>
-                <p className="font-medium">
-                  {item.supplierName} · {formatMmk(item.amountMmk)}
-                </p>
-                <p className="text-muted">
-                  {item.status} · pay {formatDisplayDate(item.expectedPayDate)}
-                </p>
-              </div>
-              <div className="flex gap-3">
-                {item.status !== 'paid' ? (
-                  <button
-                    type="button"
-                    className="text-healthy"
-                    onClick={() => updatePayable({ ...item, status: 'paid' })}
-                  >
-                    Mark paid
-                  </button>
-                ) : null}
-                <button
-                  type="button"
-                  className="text-risk"
-                  onClick={() => removePayable(item.id)}
-                >
-                  Remove
-                </button>
-              </div>
-            </li>
-          ))}
-        </ul>
-      </section>
-
-      <section className="rounded-lg border border-line bg-white p-4">
-        <h2 className="font-semibold text-navy">Demo and reset</h2>
+        <h2 className="font-semibold text-navy">Customer and supplier bills</h2>
         <p className="mt-2 text-sm text-muted">
-          Sample data helps judges try the app quickly. Reset removes everything
-          stored in this browser.
+          Receivables, payables, the payment calendar and Myanmar reminders are on the Bills
+          page.
         </p>
+        <Link
+          to="/bills"
+          className="mt-3 inline-flex rounded-md bg-bank-blue px-4 py-2 text-sm font-semibold text-white"
+        >
+          Open receivables and payables
+        </Link>
+      </section>
+
+      <section className="rounded-lg border border-mint bg-pale p-4">
+        <h2 className="font-semibold text-navy">Demo Mode</h2>
+        <p className="mt-2 text-sm text-muted">
+          Demonstration data for six Myanmar shops. Each shop unlocks a different
+          forecast family. Loading a demo replaces saved shop data in this
+          browser.
+        </p>
+        <div className="mt-4">
+          <DemoBusinessSwitcher
+            variant="full"
+            onLoaded={() => navigate('/')}
+          />
+        </div>
         <div className="mt-4 flex flex-wrap gap-3">
           <button
             type="button"
-            className="rounded-md border border-navy px-4 py-2 font-semibold text-navy"
+            className="rounded-md bg-bank-blue-light px-4 py-2 font-semibold text-navy"
             onClick={() => {
-              loadSampleData()
+              if (selectedDemoId) {
+                resetDemoData()
+              } else {
+                loadDemoBusiness('minimart')
+              }
               navigate('/')
             }}
           >
-            Load sample shop
+            Reset demo data
           </button>
           <button
             type="button"

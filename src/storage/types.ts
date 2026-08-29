@@ -29,6 +29,16 @@ export const EMPTY_SCENARIOS: ScenarioAssumptions = {
   collectionDelayDays: 0,
   extraStockPurchaseMmk: 0,
   extraLoanInflowMmk: 0,
+  revenueGrowthRatePercent: 8,
+  expenseGrowthRatePercent: 6,
+  inflationRatePercent: 5,
+  customerCollectionRatePercent: 100,
+  plannedInvestmentMmk: 0,
+  plannedLoanMmk: 0,
+  newBranchExpansionCostMmk: 0,
+  emergencyCashReserveTargetMmk: 0,
+  supplierPostponeDays: 0,
+  hireEmployeeMonthlyWageMmk: 0,
 }
 
 export function emptyStore(): AppStore {

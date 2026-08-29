@@ -9,19 +9,34 @@ interface StatCardProps {
 
 const toneClass = {
   default: 'border-line bg-white',
-  healthy: 'border-healthy/30 bg-healthy-bg',
-  watch: 'border-watch/30 bg-watch-bg',
-  risk: 'border-risk/30 bg-risk-bg',
+  healthy: 'border-healthy bg-healthy-bg',
+  watch: 'border-watch bg-watch-bg',
+  risk: 'border-risk bg-risk-bg',
+}
+
+const barClass = {
+  default: 'bg-navy',
+  healthy: 'bg-healthy',
+  watch: 'bg-watch',
+  risk: 'bg-risk',
 }
 
 export function StatCard({ label, value, hint, tone = 'default' }: StatCardProps) {
   const display = typeof value === 'number' ? formatMmk(value) : value
 
+  const valueTone =
+    tone === 'watch' ? 'text-watch-ink' : tone === 'risk' ? 'text-risk' : 'text-navy'
+
   return (
-    <article className={`rounded-lg border p-4 ${toneClass[tone]}`}>
-      <p className="text-xs font-medium uppercase tracking-wide text-muted">{label}</p>
-      <p className="mt-2 text-xl font-semibold text-ink">{display}</p>
-      {hint ? <p className="mt-1 text-sm text-muted">{hint}</p> : null}
+    <article className={`overflow-hidden rounded-lg border shadow-sm ${toneClass[tone]}`}>
+      <div className={`h-1.5 ${barClass[tone]}`} />
+      <div className="p-5">
+        <p className="text-xs font-semibold uppercase tracking-wide text-muted">{label}</p>
+        <p className={`mt-2 text-3xl font-bold leading-tight tracking-tight ${valueTone}`}>
+          {display}
+        </p>
+        {hint ? <p className="mt-1.5 text-sm text-muted">{hint}</p> : null}
+      </div>
     </article>
   )
 }

@@ -1,152 +1,253 @@
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import {
-  Area,
-  AreaChart,
-  CartesianGrid,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from 'recharts'
-import { HealthBadge } from '../components/ui/HealthBadge'
-import { PageHeader } from '../components/ui/PageHeader'
-import { StatCard } from '../components/ui/StatCard'
+import { Banknote, Plus, QrCode, ShieldPlus, Truck } from 'lucide-react'
+import { CashHub } from '../components/dashboard/CashHub'
+import { FinancialDetails } from '../components/dashboard/FinancialDetails'
+import { LanguageSwitch } from '../components/dashboard/LanguageSwitch'
+import { QuickActionModal, type QuickModal } from '../components/dashboard/QuickActionForms'
+import { SevenDayTimeline } from '../components/dashboard/SevenDayTimeline'
+import { TodayActionCenter } from '../components/dashboard/TodayActionCenter'
+import { EmptyState } from '../components/ui/EmptyState'
+import { ErrorState } from '../components/ui/ErrorState'
+import { LoadingBlock, LoadingCards } from '../components/ui/LoadingBlock'
+import { NotificationCenter } from '../components/notifications/NotificationCenter'
 import { useApp } from '../context/useApp'
+import { assessCashFlowHealth, buildForecast, getCheckInForDate, getCurrentCashMmk } from '../lib/cashflow'
+import { bilingualLine, pickLine } from '../lib/checkInCopy'
+import { DASHBOARD_COPY } from '../lib/dashboardCopy'
+import { expenseCategoryChartData, historicalClosingPoints } from '../lib/dashboardData'
 import {
-  assessCashFlowHealth,
-  buildForecast,
-  checkInNetMmk,
-  getCheckInForDate,
-  getCurrentCashMmk,
-} from '../lib/cashflow'
-import { formatShortDate, todayIsoDate } from '../lib/dates'
-import { formatCompactMmk, formatMmk } from '../lib/money'
+  buildSevenDayTimeline,
+  buildTodayActionItems,
+  cashHubStatus,
+  computeCashCover,
+  computeSafeToSpend,
+  latestBooksUpdatedAt,
+  lowestIn14Days,
+  visibleTodayActions,
+} from '../lib/dashboardMetrics'
+import { formatDisplayDate, formatShortDate, todayIsoDate } from '../lib/dates'
+import { measureCheckInHistory } from '../lib/forecastEngine'
+import { formatSavedAt } from '../lib/ownerJourney'
+import { totalOpenReceivablesMmk } from '../lib/schedule'
+import {
+  loadCompletedActionIds,
+  loadHideAmounts,
+  loadLastUpdatedDisplay,
+  markActionCompleted,
+  saveHideAmounts,
+  saveLastUpdatedDisplay,
+} from '../lib/uiStorage'
 
 export function DashboardPage() {
-  const { store } = useApp()
+  const { store, isReady, loadError, retryLoad } = useApp()
   const today = todayIsoDate()
-  const currentCash = getCurrentCashMmk(store)
-  const forecast = buildForecast(store, 14, store.scenarios, today)
-  const health = assessCashFlowHealth(store, forecast)
+  const language = store.profile?.preferredLanguage ?? 'en'
+  const [hideAmounts, setHideAmounts] = useState(loadHideAmounts)
+  const [completedIds, setCompletedIds] = useState(() => loadCompletedActionIds(today))
+  const [modal, setModal] = useState<QuickModal>(null)
+
+  useEffect(() => {
+    const stamp = latestBooksUpdatedAt(store, loadLastUpdatedDisplay() ?? undefined)
+    saveLastUpdatedDisplay(stamp)
+  }, [store])
+
+  if (!isReady) {
+    return (
+      <div className="space-y-4">
+        <LoadingCards count={2} />
+        <LoadingBlock />
+      </div>
+    )
+  }
+
+  if (loadError) {
+    return (
+      <ErrorState title="Could not load dashboard" message={loadError} onRetry={retryLoad} />
+    )
+  }
+
+  let weekForecast
+  let health
+  let forecast14
+  try {
+    getCurrentCashMmk(store)
+    weekForecast = buildForecast(store, 7, store.scenarios, today)
+    forecast14 = buildForecast(store, 14, store.scenarios, today)
+    health = assessCashFlowHealth(store, forecast14)
+  } catch {
+    return (
+      <ErrorState
+        title="Dashboard numbers failed"
+        message="Cash figures could not be calculated from the saved books. Try reloading."
+        onRetry={retryLoad}
+      />
+    )
+  }
+
+  const sts = computeSafeToSpend(store, today)
+  const hubStatus = cashHubStatus(forecast14, health)
+  const cashCover = computeCashCover(store)
+  const recordedDays = measureCheckInHistory(store.checkIns, today).recordedDays
+  const lowest = lowestIn14Days(forecast14, recordedDays)
   const todayCheckIn = getCheckInForDate(store, today)
-  const chartData = forecast.points.map((point) => ({
+  const actions = visibleTodayActions(buildTodayActionItems(store, today), new Set(completedIds))
+  const timeline = buildSevenDayTimeline(store, weekForecast, today)
+  const updatedAt = latestBooksUpdatedAt(store)
+  const lastUpdatedLabel = formatSavedAt(updatedAt, language)
+  const history = historicalClosingPoints(store, 14)
+  const balanceChart = [
+    ...history.map((row) => ({
+      date: formatShortDate(row.date),
+      historical: row.historical,
+      forecast: null as number | null,
+    })),
+    ...weekForecast.points.map((point, index) => ({
+      date: formatShortDate(point.date),
+      historical: index === 0 && history.length === 0 ? weekForecast.startingBalanceMmk : null,
+      forecast: point.projectedBalanceMmk,
+    })),
+  ]
+  const flowChart = weekForecast.points.map((point) => ({
     date: formatShortDate(point.date),
-    balance: point.projectedBalanceMmk,
+    inflows: point.inflowsMmk,
+    outflows: point.outflowsMmk,
   }))
+  const expenses = expenseCategoryChartData(store)
+  const hasBooks =
+    store.checkIns.length > 0 || store.receivables.length > 0 || store.payables.length > 0
+  const ctaLabel = todayCheckIn
+    ? bilingualLine(DASHBOARD_COPY.editToday, language)
+    : bilingualLine(DASHBOARD_COPY.addToday, language)
+
+  const quick = [
+    {
+      id: 'sale',
+      label: pickLine(DASHBOARD_COPY.recordSale, language),
+      icon: Banknote,
+      onClick: () => setModal('sale'),
+    },
+    {
+      id: 'qr',
+      label: pickLine(DASHBOARD_COPY.receiveQr, language),
+      icon: QrCode,
+      href: '/receive-qr',
+    },
+    {
+      id: 'pay',
+      label: pickLine(DASHBOARD_COPY.paySupplier, language),
+      icon: Truck,
+      onClick: () => setModal('pay'),
+    },
+    {
+      id: 'reserve',
+      label: pickLine(DASHBOARD_COPY.addReserve, language),
+      icon: ShieldPlus,
+      onClick: () => setModal('reserve'),
+    },
+  ] as const
 
   return (
-    <div>
-      <PageHeader
-        title="Dashboard"
-        subtitle="See today’s cash, the next 14 days, and what to do next."
+    <div className="space-y-3 pb-20 lg:pb-0">
+      <header className="flex items-center justify-between gap-2">
+        <div className="min-w-0">
+          <p className="truncate text-base font-semibold text-navy">
+            {store.profile?.businessName ?? 'SME Mate AI'}
+          </p>
+          <p className="text-base text-muted">{formatDisplayDate(today)}</p>
+        </div>
+        <div className="flex shrink-0 items-center gap-1">
+          <NotificationCenter />
+          <LanguageSwitch />
+        </div>
+      </header>
+
+      <CashHub
+        language={language}
+        sts={sts}
+        status={hubStatus}
+        confidence={weekForecast.confidenceLevel}
+        lastUpdatedLabel={lastUpdatedLabel}
+        hideAmounts={hideAmounts}
+        onToggleHide={() => {
+          const next = !hideAmounts
+          setHideAmounts(next)
+          saveHideAmounts(next)
+        }}
       />
 
-      <div className="mb-4 flex flex-wrap items-center gap-3">
-        <HealthBadge status={health.status} />
-        <p className="text-sm text-muted">{health.summary}</p>
-      </div>
-
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard
-          label="Cash now"
-          value={currentCash}
-          hint="From starting cash plus check-ins"
-          tone={currentCash < 0 ? 'risk' : 'healthy'}
-        />
-        <StatCard
-          label="Cash cover"
-          value={`${health.daysOfCash} days`}
-          hint="How long cash can pay normal daily costs"
-        />
-        <StatCard
-          label="Lowest in 14 days"
-          value={forecast.lowestBalanceMmk}
-          tone={forecast.lowestBalanceMmk < 0 ? 'risk' : 'default'}
-        />
-        <StatCard
-          label="Health score"
-          value={`${health.score} / 100`}
-          tone={
-            health.status === 'healthy'
-              ? 'healthy'
-              : health.status === 'watch'
-                ? 'watch'
-                : 'risk'
-          }
-        />
-      </div>
-
-      <section className="mt-5 rounded-lg border border-line bg-white p-4">
-        <div className="mb-3 flex items-center justify-between gap-3">
-          <h2 className="font-semibold text-navy">14-day cash path</h2>
-          <Link to="/forecast" className="text-sm font-medium text-bank-blue">
-            Open forecast
-          </Link>
-        </div>
-        <div className="h-56">
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={chartData}>
-              <CartesianGrid stroke="#d5dee8" strokeDasharray="3 3" />
-              <XAxis dataKey="date" tick={{ fontSize: 12 }} />
-              <YAxis
-                tick={{ fontSize: 12 }}
-                tickFormatter={(value: number) => formatCompactMmk(value)}
-                width={78}
-              />
-              <Tooltip
-                formatter={(value) => formatMmk(Number(value ?? 0))}
-                labelStyle={{ color: '#0b3d6e' }}
-              />
-              <Area
-                type="monotone"
-                dataKey="balance"
-                stroke="#1a5fa8"
-                fill="#e8f1fa"
-                strokeWidth={2}
-              />
-            </AreaChart>
-          </ResponsiveContainer>
+      <section>
+        <h2 className="sr-only">{pickLine(DASHBOARD_COPY.quickActions, language)}</h2>
+        <div className="grid grid-cols-2 gap-2">
+          {quick.map((item) => {
+            const Icon = item.icon
+            const className =
+              'touch-target flex items-center justify-center gap-2 rounded-[14px] border border-line bg-white px-3 text-base font-semibold text-navy'
+            if ('href' in item) {
+              return (
+                <Link key={item.id} to={item.href} className={className}>
+                  <Icon size={20} />
+                  {item.label}
+                </Link>
+              )
+            }
+            return (
+              <button key={item.id} type="button" className={className} onClick={item.onClick}>
+                <Icon size={20} />
+                {item.label}
+              </button>
+            )
+          })}
         </div>
       </section>
 
-      <div className="mt-5 grid gap-4 lg:grid-cols-2">
-        <section className="rounded-lg border border-line bg-white p-4">
-          <h2 className="font-semibold text-navy">Daily Cash Check-in</h2>
-          {todayCheckIn ? (
-            <p className="mt-2 text-sm text-muted">
-              Today is saved. Net cash movement:{' '}
-              <strong className="text-ink">{formatMmk(checkInNetMmk(todayCheckIn))}</strong>
-            </p>
-          ) : (
-            <p className="mt-2 text-sm text-muted">
-              You have not recorded today yet. This takes about one minute.
-            </p>
-          )}
-          <Link
-            to="/check-in"
-            className="mt-4 inline-flex rounded-md bg-navy px-4 py-2 text-sm font-semibold text-white"
-          >
-            {todayCheckIn ? 'Edit today’s check-in' : 'Do today’s check-in'}
-          </Link>
-        </section>
+      <Link
+        to="/check-in"
+        className="hidden min-h-11 w-full items-center justify-center gap-2 rounded-[14px] bg-navy px-4 text-base font-bold text-white lg:flex"
+      >
+        <Plus size={20} />
+        {ctaLabel}
+      </Link>
 
-        <section className="rounded-lg border border-line bg-white p-4">
-          <h2 className="font-semibold text-navy">What to do now</h2>
-          <ul className="mt-2 list-disc space-y-2 pl-5 text-sm text-ink">
-            {forecast.recommendedActions.slice(0, 3).map((action) => (
-              <li key={action}>{action}</li>
-            ))}
-          </ul>
-          <div className="mt-4 flex flex-wrap gap-3">
-            <Link to="/scenarios" className="text-sm font-medium text-bank-blue">
-              Try a what-if plan
-            </Link>
-            <Link to="/reports" className="text-sm font-medium text-bank-blue">
-              Weekly report
-            </Link>
-          </div>
-        </section>
-      </div>
+      {!hasBooks ? (
+        <EmptyState
+          title={pickLine(DASHBOARD_COPY.homeTitle, language)}
+          message={bilingualLine(DASHBOARD_COPY.noBooks, language)}
+        />
+      ) : null}
+
+      <TodayActionCenter
+        language={language}
+        items={actions}
+        hideAmounts={hideAmounts}
+        onComplete={(id) => setCompletedIds(markActionCompleted(today, id))}
+      />
+
+      <SevenDayTimeline language={language} days={timeline} hideAmounts={hideAmounts} />
+
+      <FinancialDetails
+        store={store}
+        language={language}
+        hideAmounts={hideAmounts}
+        cashCover={cashCover}
+        lowest={lowest}
+        health={health}
+        totalReceivablesMmk={totalOpenReceivablesMmk(store.receivables)}
+        weekForecast={weekForecast}
+        balanceChart={balanceChart}
+        flowChart={flowChart}
+        expenses={expenses}
+      />
+
+      <Link
+        to="/check-in"
+        className="fixed inset-x-3 bottom-16 z-30 flex min-h-11 items-center justify-center gap-2 rounded-[14px] bg-navy px-4 text-base font-bold text-white shadow-md lg:hidden"
+      >
+        <Plus size={20} />
+        {ctaLabel}
+      </Link>
+
+      <QuickActionModal kind={modal} language={language} onClose={() => setModal(null)} />
     </div>
   )
 }

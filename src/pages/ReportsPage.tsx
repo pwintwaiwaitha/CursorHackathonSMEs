@@ -16,15 +16,26 @@ import { formatDisplayDate, todayIsoDate } from '../lib/dates'
 import { formatCompactMmk, formatMmk } from '../lib/money'
 import type { DailyCashCheckIn } from '../types/models'
 
+function cashIn(row: DailyCashCheckIn): number {
+  return (
+    row.cashSalesMmk + row.customerDebtCollectedMmk + row.otherCashReceivedMmk
+  )
+}
+
+function cashOut(row: DailyCashCheckIn): number {
+  return (
+    row.operatingExpensesMmk +
+    row.inventoryPurchasesMmk +
+    row.supplierPaymentsMmk +
+    row.otherCashPaidMmk
+  )
+}
+
 function sumCheckIns(rows: DailyCashCheckIn[]) {
   return rows.reduce(
     (acc, row) => ({
-      sales: acc.sales + row.cashSalesMmk + row.otherInflowsMmk,
-      expenses:
-        acc.expenses +
-        row.cashExpensesMmk +
-        row.supplierPaymentsMmk +
-        row.stockPurchasesMmk,
+      sales: acc.sales + cashIn(row),
+      expenses: acc.expenses + cashOut(row),
       net: acc.net + checkInNetMmk(row),
       days: acc.days + 1,
     }),
@@ -52,9 +63,8 @@ export function ReportsPage() {
     .filter((row) => row.date >= last14Start)
     .map((row) => ({
       date: formatDisplayDate(row.date),
-      sales: row.cashSalesMmk + row.otherInflowsMmk,
-      out:
-        row.cashExpensesMmk + row.supplierPaymentsMmk + row.stockPurchasesMmk,
+      sales: cashIn(row),
+      out: cashOut(row),
     }))
 
   return (
@@ -102,7 +112,7 @@ export function ReportsPage() {
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={last14}>
-                <CartesianGrid stroke="#d5dee8" />
+                <CartesianGrid stroke="#DDE7E0" />
                 <XAxis dataKey="date" tick={{ fontSize: 11 }} />
                 <YAxis
                   width={78}
@@ -110,8 +120,8 @@ export function ReportsPage() {
                   tickFormatter={(value: number) => formatCompactMmk(value)}
                 />
                 <Tooltip formatter={(value) => formatMmk(Number(value ?? 0))} />
-                <Bar dataKey="sales" name="Money in" fill="#1a7f4c" />
-                <Bar dataKey="out" name="Money out" fill="#c0392b" />
+                <Bar dataKey="sales" name="Money in" fill="#237A57" />
+                <Bar dataKey="out" name="Money out" fill="#C0784A" />
               </BarChart>
             </ResponsiveContainer>
           </div>

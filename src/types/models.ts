@@ -43,17 +43,43 @@ export interface BusinessProfile {
   updatedAt: string
 }
 
+export const EXPENSE_BREAKDOWN_CATEGORIES = [
+  'inventory',
+  'delivery',
+  'rent',
+  'salary',
+  'electricity',
+  'marketing',
+  'transport',
+  'other',
+] as const
+
+export type ExpenseBreakdownCategory =
+  (typeof EXPENSE_BREAKDOWN_CATEGORIES)[number]
+
+export interface ExpenseBreakdownLine {
+  id: string
+  category: ExpenseBreakdownCategory
+  amountMmk: number
+}
+
 export interface DailyCashCheckIn {
   id: string
   date: string
   openingCashMmk: number
   cashSalesMmk: number
-  otherInflowsMmk: number
-  cashExpensesMmk: number
+  customerDebtCollectedMmk: number
+  creditSalesMmk: number
+  operatingExpensesMmk: number
+  inventoryPurchasesMmk: number
   supplierPaymentsMmk: number
-  stockPurchasesMmk: number
+  otherCashReceivedMmk: number
+  otherCashPaidMmk: number
+  expenseBreakdowns: ExpenseBreakdownLine[]
   notes: string
+  closingCashMmk: number
   createdAt: string
+  updatedAt: string
 }
 
 export const CASH_ITEM_KINDS = ['inflow', 'outflow'] as const
@@ -74,7 +100,12 @@ export interface ScheduledCashItem {
   notes: string
 }
 
-export const RECEIVABLE_STATUSES = ['open', 'collected', 'overdue'] as const
+export const RECEIVABLE_STATUSES = [
+  'pending',
+  'partially_paid',
+  'paid',
+  'overdue',
+] as const
 
 export type ReceivableStatus = (typeof RECEIVABLE_STATUSES)[number]
 
@@ -82,13 +113,13 @@ export interface Receivable {
   id: string
   customerName: string
   amountMmk: number
-  dueDate: string
-  expectedCollectDate: string
+  expectedPaymentDate: string
   status: ReceivableStatus
+  amountPaidMmk: number
   notes: string
 }
 
-export const PAYABLE_STATUSES = ['open', 'paid', 'overdue'] as const
+export const PAYABLE_STATUSES = ['pending', 'paid', 'overdue'] as const
 
 export type PayableStatus = (typeof PAYABLE_STATUSES)[number]
 
@@ -97,10 +128,42 @@ export interface Payable {
   supplierName: string
   amountMmk: number
   dueDate: string
-  expectedPayDate: string
+  category: ExpenseCategory
   status: PayableStatus
+  recurrence: Recurrence
   notes: string
 }
+
+export const RECEIVABLE_STATUS_LABELS: Record<ReceivableStatus, string> = {
+  pending: 'Pending / စောင့်ဆိုင်း',
+  partially_paid: 'Partially paid / တစ်စိတ်တစ်ပိုင်း',
+  paid: 'Paid / ပေးပြီး',
+  overdue: 'Overdue / ကျော်လွန်',
+}
+
+export const PAYABLE_STATUS_LABELS: Record<PayableStatus, string> = {
+  pending: 'Pending / စောင့်ဆိုင်း',
+  paid: 'Paid / ပေးပြီး',
+  overdue: 'Overdue / ကျော်လွန်',
+}
+
+export const CONFIDENCE_LEVELS = ['high', 'medium', 'low', 'very_low'] as const
+
+export type ConfidenceLevel = (typeof CONFIDENCE_LEVELS)[number]
+
+export const FORECAST_KINDS = [
+  'scheduled',
+  'short_term',
+  'early',
+  'scenario',
+  'strategic',
+] as const
+
+export type ForecastKind = (typeof FORECAST_KINDS)[number]
+
+export const SCENARIO_BANDS = ['optimistic', 'expected', 'pessimistic'] as const
+
+export type ScenarioBand = (typeof SCENARIO_BANDS)[number]
 
 export interface ForecastPoint {
   date: string
@@ -115,16 +178,34 @@ export const SHORTAGE_RISKS = ['low', 'medium', 'high'] as const
 export type ShortageRisk = (typeof SHORTAGE_RISKS)[number]
 
 export interface ForecastResult {
+  levelId: string
+  label: string
+  kind: ForecastKind
+  locked: boolean
+  unlockRequirement: string | null
+  startDate: string
+  endDate: string
   horizonDays: number
   startingBalanceMmk: number
   endingBalanceMmk: number
+  predictedClosingCashMmk: number
   lowestBalanceMmk: number
+  lowestPredictedCashMmk: number
   shortageDays: number
   firstShortageDate: string | null
+  shortageDate: string | null
+  shortageAmountMmk: number
   points: ForecastPoint[]
   causes: string[]
+  mainRiskDrivers: string[]
   recommendedActions: string[]
+  suggestedActions: string[]
   risk: ShortageRisk
+  confidenceLevel: ConfidenceLevel
+  dataPeriodUsed: string
+  missingDataWarnings: string[]
+  disclaimer: string
+  scenarioBand?: ScenarioBand
 }
 
 export interface ScenarioAssumptions {
@@ -133,6 +214,23 @@ export interface ScenarioAssumptions {
   collectionDelayDays: number
   extraStockPurchaseMmk: number
   extraLoanInflowMmk: number
+  revenueGrowthRatePercent: number
+  expenseGrowthRatePercent: number
+  inflationRatePercent: number
+  customerCollectionRatePercent: number
+  plannedInvestmentMmk: number
+  plannedLoanMmk: number
+  newBranchExpansionCostMmk: number
+  emergencyCashReserveTargetMmk: number
+  supplierPostponeDays: number
+  hireEmployeeMonthlyWageMmk: number
+}
+
+export const CONFIDENCE_LABELS: Record<ConfidenceLevel, string> = {
+  high: 'High',
+  medium: 'Medium',
+  low: 'Low',
+  very_low: 'Very low',
 }
 
 export const CASH_FLOW_HEALTH_STATUSES = [
@@ -178,6 +276,6 @@ export const EXPENSE_CATEGORY_LABELS: Record<ExpenseCategory, string> = {
 export const HEALTH_LABELS: Record<CashFlowHealthStatus, string> = {
   healthy: 'Healthy',
   watch: 'Watch',
-  at_risk: 'At risk',
-  critical: 'Critical',
+  at_risk: 'High Risk',
+  critical: 'High Risk',
 }

@@ -1,3 +1,5 @@
+import { normalizeCheckIn, rechainCheckIns } from '../lib/checkIn'
+import { normalizePayable, normalizeReceivable } from '../lib/schedule'
 import type { AppStore, StorageAdapter } from './types'
 import { emptyStore, STORAGE_KEY } from './types'
 
@@ -11,14 +13,35 @@ function asStore(value: unknown): AppStore {
     return fallback
   }
 
+  const profile = (value.profile as AppStore['profile']) ?? null
+  const checkIns = Array.isArray(value.checkIns)
+    ? value.checkIns.flatMap((item) => {
+        const normalized = normalizeCheckIn(item)
+        return normalized ? [normalized] : []
+      })
+    : []
+
   return {
-    profile: (value.profile as AppStore['profile']) ?? null,
-    checkIns: Array.isArray(value.checkIns) ? value.checkIns : [],
+    profile,
+    checkIns: rechainCheckIns(
+      checkIns,
+      profile?.startingCashBalanceMmk ?? 0,
+    ),
     scheduledItems: Array.isArray(value.scheduledItems)
       ? value.scheduledItems
       : [],
-    receivables: Array.isArray(value.receivables) ? value.receivables : [],
-    payables: Array.isArray(value.payables) ? value.payables : [],
+    receivables: Array.isArray(value.receivables)
+      ? value.receivables.flatMap((item) => {
+          const normalized = normalizeReceivable(item)
+          return normalized ? [normalized] : []
+        })
+      : [],
+    payables: Array.isArray(value.payables)
+      ? value.payables.flatMap((item) => {
+          const normalized = normalizePayable(item)
+          return normalized ? [normalized] : []
+        })
+      : [],
     scenarios: {
       ...fallback.scenarios,
       ...(isRecord(value.scenarios) ? value.scenarios : {}),

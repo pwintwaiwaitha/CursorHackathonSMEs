@@ -2,20 +2,54 @@
 
 @theme {
   --font-sans: "IBM Plex Sans", "Noto Sans Myanmar", "Segoe UI", system-ui, sans-serif;
-  --color-navy: #0b3d6e;
-  --color-navy-dark: #072a4d;
-  --color-bank-blue: #1a5fa8;
-  --color-bank-blue-light: #e8f1fa;
-  --color-page: #f4f7fb;
-  --color-line: #d5dee8;
-  --color-ink: #1c2a3a;
-  --color-muted: #5b6b7c;
-  --color-healthy: #1a7f4c;
-  --color-healthy-bg: #e8f6ee;
-  --color-watch: #b8860b;
-  --color-watch-bg: #fff6db;
-  --color-risk: #c0392b;
+
+  /* navy → deep green (sidebar, headers) */
+  --color-navy: #174c3c;
+  --color-navy-dark: #123d30;
+
+  /* bank-blue → main green (primary actions, expected) */
+  --color-bank-blue: #237a57;
+  --color-bank-blue-light: #ddf2e5;
+
+  --color-action: #2f9368;
+  --color-pale: #edf8f1;
+  --color-mint: #b8dec7;
+  --color-leaf: #b8dec7;
+
+  --color-page: #f7faf7;
+  --color-card: #ffffff;
+  --color-warm: #fbfaf4;
+  --color-line: #dde7e0;
+  --color-ink: #18372d;
+  --color-muted: #66766f;
+
+  --color-healthy: #237a57;
+  --color-healthy-bg: #edf8f1;
+
+  /* watch → yellow system; use watch-ink on yellow surfaces */
+  --color-watch: #f2c94c;
+  --color-watch-ink: #7a5a00;
+  --color-watch-bg: #fff3c4;
+  --color-gold: #f2c94c;
+  --color-gold-bg: #fff3c4;
+
+  --color-risk: #d9534f;
   --color-risk-bg: #fdecea;
+
+  --color-outflow: #c0784a;
+
+  --color-chart-historical: #174c3c;
+  --color-chart-forecast: #2f9368;
+  --color-chart-expected: #237a57;
+  --color-chart-optimistic: #2f9368;
+  --color-chart-pessimistic: #f2c94c;
+  --color-chart-shortage: #d9534f;
+  --color-chart-inflow: #237a57;
+  --color-chart-outflow: #c0784a;
+  --color-chart-grid: #dde7e0;
+
+  --radius-lg: 1rem;
+  --shadow-sm: 0 1px 2px rgb(23 76 60 / 0.06);
 }
 
 html,
@@ -29,6 +63,8 @@ body {
   background: var(--color-page);
   color: var(--color-ink);
   font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: 1.5;
 }
 
 input,
@@ -36,6 +72,7 @@ select,
 textarea,
 button {
   font-family: inherit;
+  font-size: 16px;
 }
 
 input:focus,
@@ -43,5 +80,16 @@ select:focus,
 textarea:focus,
 button:focus-visible {
   outline: 2px solid var(--color-bank-blue);
-  outline-offset: 1px;
+  outline-offset: 2px;
+}
+
+.touch-target {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+@layer components {
+  .rounded-lg.border.bg-white {
+    box-shadow: var(--shadow-sm);
+  }
 }
