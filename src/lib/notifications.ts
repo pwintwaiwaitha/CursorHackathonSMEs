@@ -81,7 +81,7 @@ export function buildOwnerNotifications(options: {
       type: 'overdue',
       title: COPY.overdueTitle,
       body: COPY.overdueBody,
-      href: '/bills',
+      href: '/payments',
       actionLabel: COPY.overdueAction,
     })
   }
@@ -92,7 +92,7 @@ export function buildOwnerNotifications(options: {
       type: 'upcoming_bills',
       title: COPY.billsTitle,
       body: COPY.billsBody,
-      href: '/bills',
+      href: '/payments',
       actionLabel: COPY.billsAction,
     })
   }

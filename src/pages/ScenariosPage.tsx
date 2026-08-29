@@ -25,7 +25,7 @@ import { CONFIDENCE_LABELS, type ScenarioAssumptions, type ScenarioBand } from '
 
 const BANDS: ScenarioBand[] = ['optimistic', 'expected', 'pessimistic']
 
-export function ScenariosPage() {
+export function ScenariosPage({ embedded = false }: { embedded?: boolean }) {
   const { store, saveScenarios } = useApp()
   const [form, setForm] = useState<ScenarioAssumptions>({
     ...EMPTY_SCENARIOS,
@@ -93,10 +93,16 @@ export function ScenariosPage() {
 
   return (
     <div>
-      <PageHeader
-        title="Long-term scenarios"
-        subtitle="Optimistic, expected and pessimistic paths use the same books. They are planning estimates, not promises."
-      />
+      {embedded ? (
+        <p className="mb-4 text-sm text-muted">
+          Long-term views are scenario projections, not guaranteed predictions.
+        </p>
+      ) : (
+        <PageHeader
+          title="Long-term scenarios"
+          subtitle="Optimistic, expected and pessimistic paths use the same books. They are planning estimates, not promises."
+        />
+      )}
 
       {level.strategic ? (
         <p className="mb-4 rounded-md border border-watch bg-watch-bg px-3 py-2 text-sm text-watch-ink">

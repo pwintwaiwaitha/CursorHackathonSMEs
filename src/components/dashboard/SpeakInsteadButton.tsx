@@ -1,13 +1,21 @@
 import { useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { Mic } from 'lucide-react'
 import type { PreferredLanguage } from '../../types/models'
-import { bilingualLine } from '../../lib/checkInCopy'
+import { pickLine } from '../../lib/checkInCopy'
 import { DASHBOARD_COPY } from '../../lib/dashboardCopy'
 import { speechSupported, startNoteDictation } from '../../lib/speechNotes'
 
-export function SpeakInsteadButton({ language }: { language: PreferredLanguage }) {
-  const navigate = useNavigate()
+export function SpeakInsteadButton({
+  language,
+  onTranscript,
+  large = false,
+  label,
+}: {
+  language: PreferredLanguage
+  onTranscript?: (text: string) => void
+  large?: boolean
+  label?: string
+}) {
   const [listening, setListening] = useState(false)
   const [message, setMessage] = useState('')
   const session = useRef<{ stop: () => void } | null>(null)
@@ -20,19 +28,19 @@ export function SpeakInsteadButton({ language }: { language: PreferredLanguage }
 
   function onSpeak() {
     if (!speechSupported()) {
-      setMessage(bilingualLine(DASHBOARD_COPY.speechUnsupported, language))
+      setMessage(pickLine(DASHBOARD_COPY.speechUnsupported, language))
       return
     }
     if (listening) {
       stop()
       return
     }
-    setMessage(bilingualLine(DASHBOARD_COPY.speechHint, language))
+    setMessage(pickLine(DASHBOARD_COPY.speechHint, language))
     setListening(true)
     const handle = startNoteDictation({
       language,
       onTranscript: (text) => {
-        navigate(`/check-in?notes=${encodeURIComponent(text)}`)
+        onTranscript?.(text)
       },
       onEnd: () => {
         session.current = null
@@ -41,7 +49,7 @@ export function SpeakInsteadButton({ language }: { language: PreferredLanguage }
     })
     if (!handle) {
       setListening(false)
-      setMessage(bilingualLine(DASHBOARD_COPY.speechUnsupported, language))
+      setMessage(pickLine(DASHBOARD_COPY.speechUnsupported, language))
       return
     }
     session.current = handle
@@ -52,12 +60,14 @@ export function SpeakInsteadButton({ language }: { language: PreferredLanguage }
       <button
         type="button"
         onClick={onSpeak}
-        className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-md bg-bank-blue-light px-4 text-base font-semibold text-navy"
+        className={`inline-flex w-full items-center justify-center gap-2 rounded-md bg-healthy-bg px-4 text-base font-semibold text-navy ${
+          large ? 'min-h-14' : 'min-h-11'
+        }`}
       >
-        <Mic size={20} />
+        <Mic size={large ? 24 : 20} />
         {listening
-          ? bilingualLine(DASHBOARD_COPY.listening, language)
-          : bilingualLine(DASHBOARD_COPY.speakInstead, language)}
+          ? pickLine(DASHBOARD_COPY.listening, language)
+          : (label ?? pickLine(DASHBOARD_COPY.speakInstead, language))}
       </button>
       {message ? (
         <p className="text-base text-muted" role="status">

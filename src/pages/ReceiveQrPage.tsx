@@ -107,7 +107,7 @@ export function ReceiveQrPage() {
       </div>
 
       <Link
-        to="/"
+        to="/dashboard"
         className="inline-flex min-h-11 items-center font-semibold text-navy"
       >
         {pickLine(DASHBOARD_COPY.homeTitle, language)}

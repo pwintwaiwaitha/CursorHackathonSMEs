@@ -245,7 +245,7 @@ export function PaySupplierForm({
         </button>
         {message ? <p className="text-base font-medium text-healthy">{message}</p> : null}
       </form>
-      <Link to="/bills" className="inline-flex min-h-11 items-center font-semibold text-navy" onClick={onClose}>
+      <Link to="/payments" className="inline-flex min-h-11 items-center font-semibold text-navy" onClick={onClose}>
         {pickLine(DASHBOARD_COPY.addBills, language)}
       </Link>
     </div>

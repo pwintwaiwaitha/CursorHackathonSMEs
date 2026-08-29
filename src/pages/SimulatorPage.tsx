@@ -55,7 +55,7 @@ function riskTone(risk: ShortageRisk): 'healthy' | 'watch' | 'risk' {
   return 'healthy'
 }
 
-export function SimulatorPage() {
+export function SimulatorPage({ embedded = false }: { embedded?: boolean }) {
   const { store, isReady, loadError, retryLoad, saveScenarios } = useApp()
   const [draft, setDraft] = useState<WhatIfInputs>(EMPTY_WHAT_IF)
   const [horizonDays, setHorizonDays] = useState<(typeof WHAT_IF_HORIZONS)[number]>(7)
@@ -160,10 +160,12 @@ export function SimulatorPage() {
 
   return (
     <div className="space-y-5">
-      <PageHeader
-        title="What-if cash-flow simulator"
-        subtitle="Try a decision without changing saved books. Example: if I buy 500,000 MMK of stock today, will I have enough cash next week?"
-      />
+      {embedded ? null : (
+        <PageHeader
+          title="What-if cash-flow simulator"
+          subtitle="Try a decision without changing saved books. Example: if I buy 500,000 MMK of stock today, will I have enough cash next week?"
+        />
+      )}
 
       <p className="rounded-md border border-watch bg-watch-bg px-3 py-2 text-sm text-navy">
         What-if results are planning estimates, not promises. 10-year and 30-year

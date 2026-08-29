@@ -27,7 +27,7 @@ export function CheckInHistoryList({
       </h2>
       {rows.length === 0 ? (
         <p className="mt-2 text-base text-muted">
-          {bilingualLine(CHECK_IN_COPY.pageSubtitle, language)}
+          {bilingualLine(CHECK_IN_COPY.historyEmpty, language)}
         </p>
       ) : (
         <ul className="mt-3 divide-y divide-line">

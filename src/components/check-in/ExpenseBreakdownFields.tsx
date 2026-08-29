@@ -34,10 +34,10 @@ export function ExpenseBreakdownFields({
   const categories = sortedCategories()
 
   return (
-    <section className="rounded-md border border-line bg-page p-3">
-      <h3 className="text-base font-semibold text-navy">
+    <details className="rounded-md border border-line bg-page p-3">
+      <summary className="min-h-11 cursor-pointer list-none text-base font-semibold text-navy">
         {bilingualLine(CHECK_IN_COPY.breakdownTitle, language)}
-      </h3>
+      </summary>
       <p className="mt-1 text-base text-muted">
         {bilingualLine(CHECK_IN_COPY.breakdownHint, language)}
       </p>
@@ -94,6 +94,6 @@ export function ExpenseBreakdownFields({
       >
         {bilingualLine(CHECK_IN_COPY.addBreakdown, language)}
       </button>
-    </section>
+    </details>
   )
 }

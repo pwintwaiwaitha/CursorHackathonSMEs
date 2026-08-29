@@ -48,7 +48,7 @@ export function LanguageSwitch() {
             aria-pressed={active}
             onClick={() => setLanguage(code)}
           >
-            {code === 'en' ? 'EN' : 'MY'}
+            {code === 'en' ? 'EN' : 'မြန်မာ'}
           </button>
         )
       })}

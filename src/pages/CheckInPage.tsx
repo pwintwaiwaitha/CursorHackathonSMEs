@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { CheckInCalculationPreview } from '../components/check-in/CheckInCalculationPreview'
 import { CheckInConfirmBar } from '../components/check-in/CheckInConfirmBar'
 import {
@@ -7,11 +7,10 @@ import {
   MoneyInFields,
   MoneyOutFields,
 } from '../components/check-in/CheckInFormFields'
-import { CheckInHistoryList } from '../components/check-in/CheckInHistoryList'
 import { CheckInStepper } from '../components/check-in/CheckInStepper'
 import { ExpenseBreakdownFields } from '../components/check-in/ExpenseBreakdownFields'
+import { SpeakInsteadButton } from '../components/dashboard/SpeakInsteadButton'
 import { MoneyInput } from '../components/ui/MoneyInput'
-import { PageHeader } from '../components/ui/PageHeader'
 import { useApp } from '../context/useApp'
 import {
   calculateClosingCashMmk,
@@ -48,6 +47,7 @@ import {
   saveUndoSnapshot,
   type CheckInDraft,
 } from '../lib/uiStorage'
+import { ROUTES } from '../lib/routes'
 import { dailyCheckInSchema } from '../lib/validation'
 import type { DailyCashCheckIn, ExpenseBreakdownLine } from '../types/models'
 
@@ -101,11 +101,15 @@ function startForm(
 
 export function CheckInPage() {
   const { store, saveCheckIn, deleteCheckIn } = useApp()
+  const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const language = store.profile?.preferredLanguage ?? 'en'
   const starting = store.profile?.startingCashBalanceMmk ?? 0
   const today = todayIsoDate()
-  const initial = startForm(store, today)
+  const requestedDate = searchParams.get('date')
+  const startDate =
+    requestedDate && /^\d{4}-\d{2}-\d{2}$/.test(requestedDate) ? requestedDate : today
+  const initial = startForm(store, startDate)
 
   const [form, setForm] = useState<FormState>(initial.form)
   const [step, setStep] = useState<Step>(1)
@@ -117,8 +121,10 @@ export function CheckInPage() {
   const [prefilled, setPrefilled] = useState(initial.prefilled)
   const [lastSave, setLastSave] = useState(loadLastSaveAt)
   const [canUndo, setCanUndo] = useState(() => Boolean(loadUndoSnapshot()))
-
   const spokenNotes = searchParams.get('notes') ?? ''
+  const [entry, setEntry] = useState<'choose' | 'form'>(
+    spokenNotes || requestedDate ? 'form' : 'choose',
+  )
   const [appliedSpoken, setAppliedSpoken] = useState(spokenNotes)
   if (spokenNotes && spokenNotes !== appliedSpoken) {
     setAppliedSpoken(spokenNotes)
@@ -126,6 +132,8 @@ export function CheckInPage() {
       ...current,
       notes: current.notes ? current.notes : spokenNotes,
     }))
+    setConfirmed(false)
+    setSaved(false)
   }
 
   useEffect(() => {
@@ -259,6 +267,7 @@ export function CheckInPage() {
     setSaved(true)
     setCanUndo(true)
     setUndone(false)
+    navigate(ROUTES.dashboard, { replace: true, state: { checkInSaved: true } })
   }
 
   function onUndo() {
@@ -296,26 +305,80 @@ export function CheckInPage() {
     setLargeConfirmed(false)
   }
 
-  function onDelete(id: string) {
-    const ok = window.confirm(bilingualLine(CHECK_IN_COPY.deleteConfirm, language))
-    if (!ok) {
-      return
-    }
-    deleteCheckIn(id)
-    if (existingForDate?.id === id) {
-      setForm(emptyCheckInForm(today))
-    }
-    setSaved(false)
-    setConfirmed(false)
-  }
-
   const formView = { ...form, operatingExpensesMmk }
 
+  function applySpokenDraft(text: string) {
+    setForm((current) => ({
+      ...current,
+      notes: current.notes ? `${current.notes} ${text}` : text,
+    }))
+    setConfirmed(false)
+    setSaved(false)
+    setEntry('form')
+  }
+
+  const startingCashCard = (
+    <div className="rounded-lg border border-line bg-white p-4">
+      <MoneyInput
+        id="opening"
+        language={language}
+        label={CHECK_IN_COPY.openingCash}
+        value={openingCashMmk}
+        readOnly
+        hint={
+          previousExists
+            ? bilingualLine(CHECK_IN_COPY.openingAuto, language)
+            : bilingualLine(CHECK_IN_COPY.firstDayOpening, language)
+        }
+      />
+    </div>
+  )
+
   return (
-    <div className="space-y-5">
-      <PageHeader
-        title={bilingualLine(CHECK_IN_COPY.pageTitle, language)}
-        subtitle={bilingualLine(CHECK_IN_COPY.pageSubtitle, language)}
+    <div className="space-y-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="text-xl font-semibold text-navy">
+            {bilingualLine(CHECK_IN_COPY.pageTitle, language)}
+          </h1>
+          <p className="mt-1 text-base text-muted">
+            {bilingualLine(CHECK_IN_COPY.pageSubtitle, language)}
+          </p>
+        </div>
+        <Link
+          to={ROUTES.checkInHistory}
+          className="inline-flex min-h-11 shrink-0 items-center text-sm font-semibold text-navy"
+        >
+          {bilingualLine(CHECK_IN_COPY.historyLink, language)}
+        </Link>
+      </div>
+
+      {startingCashCard}
+
+      {entry === 'choose' ? (
+        <div className="grid gap-3">
+          <SpeakInsteadButton
+            large
+            language="my"
+            label={bilingualLine(CHECK_IN_COPY.speakWithAi, language)}
+            onTranscript={applySpokenDraft}
+          />
+          <button
+            type="button"
+            className="inline-flex min-h-14 w-full items-center justify-center rounded-md border border-navy px-4 text-base font-semibold text-navy"
+            onClick={() => setEntry('form')}
+          >
+            {bilingualLine(CHECK_IN_COPY.enterManually, language)}
+          </button>
+        </div>
+      ) : null}
+
+      {entry === 'form' ? (
+        <>
+      <SpeakInsteadButton
+        language="my"
+        label={bilingualLine(CHECK_IN_COPY.speakWithAi, language)}
+        onTranscript={applySpokenDraft}
       />
 
       <p className="text-base text-muted" aria-live="polite">
@@ -340,19 +403,6 @@ export function CheckInPage() {
             onChange={(event) => loadDate(event.target.value)}
           />
         </label>
-
-        <MoneyInput
-          id="opening"
-          language={language}
-          label={CHECK_IN_COPY.openingCash}
-          value={openingCashMmk}
-          readOnly
-          hint={
-            previousExists
-              ? bilingualLine(CHECK_IN_COPY.openingAuto, language)
-              : bilingualLine(CHECK_IN_COPY.firstDayOpening, language)
-          }
-        />
 
         {prefilled && step === 2 ? (
           <p className="rounded-md bg-watch-bg px-3 py-3 text-base text-watch-ink">
@@ -449,7 +499,7 @@ export function CheckInPage() {
         {saved ? (
           <p className="rounded-md bg-healthy-bg px-3 py-3 text-base font-medium text-healthy" role="status">
             {bilingualLine(CHECK_IN_COPY.saved, language)}{' '}
-            <Link to="/" className="underline">
+            <Link to={ROUTES.dashboard} className="underline">
               {bilingualLine(CHECK_IN_COPY.seeDashboard, language)}
             </Link>
           </p>
@@ -504,14 +554,8 @@ export function CheckInPage() {
           )}
         </div>
       </form>
-
-      <CheckInHistoryList
-        language={language}
-        checkIns={store.checkIns}
-        selectedDate={form.date}
-        onEdit={loadDate}
-        onDelete={onDelete}
-      />
+        </>
+      ) : null}
     </div>
   )
 }

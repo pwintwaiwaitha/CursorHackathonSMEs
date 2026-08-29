@@ -16,7 +16,6 @@ import {
 } from 'recharts'
 import { AiAdvicePanel } from '../forecast/AiAdvicePanel'
 import { ConfidenceMeter } from './ConfidenceMeter'
-import { SpeakInsteadButton } from './SpeakInsteadButton'
 import { EmptyState } from '../ui/EmptyState'
 import { TermTooltip } from '../ui/TermTooltip'
 import type { AppStore } from '../../storage/types'
@@ -102,7 +101,7 @@ export function FinancialDetails({
                   {pickLine(DASHBOARD_COPY.noMovements, language)}
                 </p>
                 <Link
-                  to="/bills"
+                  to="/payments"
                   className="mt-2 inline-flex min-h-11 items-center rounded-[14px] bg-navy px-4 font-semibold text-white"
                 >
                   {pickLine(DASHBOARD_COPY.addBills, language)}
@@ -150,8 +149,6 @@ export function FinancialDetails({
             </p>
           </article>
         </div>
-
-        <SpeakInsteadButton language={language} />
 
         <div className="grid gap-4 lg:grid-cols-2">
           <section className="rounded-[16px] border border-line p-3">
@@ -254,7 +251,7 @@ export function FinancialDetails({
           <Link to="/forecast" className="inline-flex min-h-11 items-center font-semibold text-navy">
             Forecast
           </Link>
-          <Link to="/simulator" className="inline-flex min-h-11 items-center font-semibold text-navy">
+          <Link to="/what-if" className="inline-flex min-h-11 items-center font-semibold text-navy">
             What-if
           </Link>
           <Link to="/scenarios" className="inline-flex min-h-11 items-center font-semibold text-navy">

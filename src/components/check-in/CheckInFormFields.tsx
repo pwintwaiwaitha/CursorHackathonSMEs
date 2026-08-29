@@ -95,15 +95,6 @@ export function MoneyOutFields({
         warning={warnings.inventoryPurchasesMmk}
       />
       <MoneyInput
-        id="suppliers"
-        language={language}
-        label={CHECK_IN_COPY.supplierPayments}
-        value={form.supplierPaymentsMmk}
-        onChange={(value) => onChange('supplierPaymentsMmk', value)}
-        error={errors.supplierPaymentsMmk}
-        warning={warnings.supplierPaymentsMmk}
-      />
-      <MoneyInput
         id="operating"
         language={language}
         label={CHECK_IN_COPY.operatingExpenses}
@@ -116,6 +107,15 @@ export function MoneyOutFields({
         readOnly={operatingLocked}
         error={errors.operatingExpensesMmk}
         warning={warnings.operatingExpensesMmk}
+      />
+      <MoneyInput
+        id="suppliers"
+        language={language}
+        label={CHECK_IN_COPY.supplierPayments}
+        value={form.supplierPaymentsMmk}
+        onChange={(value) => onChange('supplierPaymentsMmk', value)}
+        error={errors.supplierPaymentsMmk}
+        warning={warnings.supplierPaymentsMmk}
       />
       <MoneyInput
         id="other-out"

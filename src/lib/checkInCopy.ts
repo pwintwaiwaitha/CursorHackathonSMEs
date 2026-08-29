@@ -10,10 +10,10 @@ export interface BilingualText {
 }
 
 export const CHECK_IN_COPY = {
-  pageTitle: { en: 'Daily Cash Check-in', my: 'နေ့စဉ်ငွေစာရင်း' },
+  pageTitle: { en: 'Today’s Cash Check-in', my: 'ယနေ့ ငွေစာရင်း' },
   pageSubtitle: {
-    en: 'Fill today’s cash in and cash out. This should take less than one minute.',
-    my: 'ယနေ့ ဝင်ငွေ/ထွက်ငွေကို ဖြည့်ပါ။ တစ်မိနစ်အတွင်း ပြီးအောင်လုပ်နိုင်သည်။',
+    en: 'Record today’s money in and money out in less than one minute.',
+    my: 'ယနေ့ ဝင်ငွေနှင့် ထွက်ငွေကို တစ်မိနစ်အတွင်း မှတ်ပါ။',
   },
   date: { en: 'Date', my: 'ရက်စွဲ' },
   openingCash: {
@@ -88,8 +88,8 @@ export const CHECK_IN_COPY = {
     my: 'ဤရက်အတွက် စာရင်းရှိပြီးသား။ သိမ်းလျှင် အဟောင်းအစားထိုးမည်။',
   },
   saved: {
-    en: 'Saved. Dashboard cash is updated.',
-    my: 'သိမ်းပြီးပါပြီ။ ဒက်ရှ်ဘုတ်ငွေ ပြင်ဆင်ပြီး။',
+    en: 'Today’s record saved successfully',
+    my: 'ယနေ့စာရင်းကို အောင်မြင်စွာ သိမ်းပြီးပါပြီ',
   },
   seeDashboard: { en: 'See dashboard', my: 'ဒက်ရှ်ဘုတ်ကြည့်ရန်' },
   historyTitle: { en: 'Saved check-ins', my: 'သိမ်းထားသောစာရင်းများ' },
@@ -111,9 +111,20 @@ export const CHECK_IN_COPY = {
     en: 'No earlier check-in. Opening cash is your starting balance.',
     my: 'အရင်စာရင်းမရှိသေးပါ။ စတင်ငွေလက်ကျန်ကို သုံးသည်။',
   },
-  step1: { en: '1. Money In', my: '၁. ငွေဝင်' },
-  step2: { en: '2. Money Out', my: '၂. ငွေထွက်' },
-  step3: { en: '3. Review', my: '၃. စစ်ဆေး' },
+  step1: { en: 'Received', my: 'ရငွေ' },
+  step2: { en: 'Paid', my: 'ပေးငွေ' },
+  step3: { en: 'Review', my: 'စစ်ဆေး' },
+  historyLink: { en: 'View Saved Check-ins', my: 'သိမ်းထားသောစာရင်းများ' },
+  stepProgress: {
+    en: '1 Received → 2 Paid → 3 Review',
+    my: '၁ ရငွေ → ၂ ပေးငွေ → ၃ စစ်ဆေး',
+  },
+  speakWithAi: { en: 'Speak with AI', my: 'AI နှင့် ပြောရန်' },
+  enterManually: { en: 'Enter manually', my: 'ကိုယ်တိုင်ရိုက်ရန်' },
+  historyEmpty: {
+    en: 'No saved check-ins yet.',
+    my: 'သိမ်းထားသောစာရင်း မရှိသေးပါ။',
+  },
   next: { en: 'Next', my: 'ရှေ့သို့' },
   back: { en: 'Back', my: 'နောက်သို့' },
   confirm: { en: 'Confirm and save', my: 'အတည်ပြုပြီး သိမ်းမည်' },
@@ -176,10 +187,7 @@ export function bilingualLine(
   text: BilingualText,
   language: PreferredLanguage,
 ): string {
-  if (language === 'my') {
-    return `${text.my} / ${text.en}`
-  }
-  return `${text.en} / ${text.my}`
+  return pickLine(text, language)
 }
 
 export function emptyCheckInForm(date: string): Omit<

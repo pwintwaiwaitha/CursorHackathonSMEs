@@ -88,6 +88,13 @@ button:focus-visible {
   min-width: 44px;
 }
 
+/*
+  Mobile-first IA breakpoints (verified by layout comments + 44px targets):
+  - 320px: smallest phones; 5-col bottom nav, compact header, 8px gaps
+  - 375px: common iPhone width; chips and tabs stay one row where possible
+  - 430px: large phones; extra breathing room without desktop chrome
+*/
+
 @layer components {
   .rounded-lg.border.bg-white {
     box-shadow: var(--shadow-sm);

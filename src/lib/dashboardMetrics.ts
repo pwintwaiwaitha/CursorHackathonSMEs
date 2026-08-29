@@ -292,7 +292,7 @@ export function buildTodayActionItems(
       reasonMy: 'ဤဖောက်သည်ငွေ ကျော်လွန်နေသည်။',
       dueDate: row.item.expectedPaymentDate,
       priority: 'high',
-      href: '/bills',
+      href: '/payments',
     })
   }
 
@@ -329,7 +329,7 @@ export function buildTodayActionItems(
         : 'ဤဘီလ်သည် ၇ ရက်အတွင်း ကျသည်။',
       dueDate: row.item.dueDate,
       priority: overdue ? 'high' : 'medium',
-      href: '/bills',
+      href: '/payments',
     })
   }
 
@@ -345,7 +345,7 @@ export function buildTodayActionItems(
       reasonMy: 'စီစဉ်ထားသော အပိုကုန်ဝယ်ယူမှုသည် ယူဆချက်တွင် ရှိသည်။',
       dueDate: today,
       priority: 'medium',
-      href: '/simulator',
+      href: '/what-if',
     })
   } else {
     const latestStock = [...store.checkIns]
@@ -362,7 +362,7 @@ export function buildTodayActionItems(
         reasonMy: 'မကြာသေးမီ ကုန်ဝယ်မှုကြောင့် ဘီလ်မတိုင်မီ ငွေကျပ်နိုင်သည်။',
         dueDate: today,
         priority: 'low',
-        href: '/simulator',
+        href: '/what-if',
       })
     }
   }

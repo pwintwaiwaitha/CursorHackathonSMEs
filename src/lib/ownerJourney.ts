@@ -102,7 +102,7 @@ function actionHref(title: string): string {
     text.includes('bill') ||
     text.includes('negotiate')
   ) {
-    return '/bills'
+    return '/payments'
   }
   if (
     text.includes('check-in') ||

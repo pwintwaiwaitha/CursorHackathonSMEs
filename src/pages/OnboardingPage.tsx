@@ -1,7 +1,9 @@
 import { useMemo, useState, type FormEvent } from 'react'
-import { Navigate, useNavigate } from 'react-router-dom'
+import { Link, Navigate, useNavigate } from 'react-router-dom'
+import { useAuth } from '../contexts/AuthContext'
 import { useApp } from '../context/useApp'
 import { DemoBusinessSwitcher } from '../components/demo/DemoBusinessSwitcher'
+import { LoadingBlock } from '../components/ui/LoadingBlock'
 import { MoneyInput } from '../components/ui/MoneyInput'
 import { businessProfileSchema } from '../lib/validation'
 import {
@@ -39,15 +41,24 @@ function emptyForm(): FormState {
 }
 
 export function OnboardingPage() {
-  const { store, saveProfile } = useApp()
+  const { store, saveProfile, isReady } = useApp()
+  const { user } = useAuth()
   const navigate = useNavigate()
   const [form, setForm] = useState<FormState>(emptyForm)
   const [errors, setErrors] = useState<Record<string, string>>({})
 
   const fieldErrors = useMemo(() => errors, [errors])
 
+  if (!isReady) {
+    return (
+      <div className="min-h-screen bg-page px-4 py-8">
+        <LoadingBlock label="Loading… / ခေတ္တစောင့်ပါ…" />
+      </div>
+    )
+  }
+
   if (store.profile) {
-    return <Navigate to="/" replace />
+    return <Navigate to="/dashboard" replace />
   }
 
   function toggleCategory(category: ExpenseCategory) {
@@ -80,7 +91,7 @@ export function OnboardingPage() {
       return
     }
     saveProfile(parsed.data)
-    navigate('/', { replace: true })
+    navigate('/dashboard', { replace: true })
   }
 
   return (
@@ -96,17 +107,32 @@ export function OnboardingPage() {
           Tell us about your shop once. Then do a short Daily Cash Check-in and
           we will show if money may run short.
         </p>
+        {user ? (
+          <p className="mt-3 rounded-md bg-bank-blue-light px-3 py-2 text-sm text-navy">
+            Signed in as {user.email}. Confirmed cash records save to your
+            account. Demo shops stay on this phone only.
+          </p>
+        ) : (
+          <p className="mt-3 text-sm text-muted">
+            Already have an account?{' '}
+            <Link to="/login" className="font-semibold text-navy underline">
+              Sign in
+            </Link>
+            {' · '}
+            <Link to="/signup" className="font-semibold text-navy underline">
+              Create account
+            </Link>
+          </p>
+        )}
 
         <section className="mt-6 rounded-lg border border-watch bg-watch-bg p-4">
-          <h2 className="font-semibold text-navy">Try Demo Mode</h2>
+          <h2 className="font-semibold text-navy">Try Thiri Fashion demo</h2>
           <p className="mt-1 text-sm text-muted">
-            Load one of six demonstration shops. This replaces any saved books in
-            this browser. Reset Demo Data is in Settings.
+            Load sample Thiri Fashion books on this phone. Reset is in Settings.
           </p>
           <div className="mt-3">
             <DemoBusinessSwitcher
-              variant="full"
-              onLoaded={() => navigate('/', { replace: true })}
+              onLoaded={() => navigate('/dashboard', { replace: true })}
             />
           </div>
         </section>

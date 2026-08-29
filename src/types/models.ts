@@ -260,7 +260,7 @@ export const BUSINESS_TYPE_LABELS: Record<BusinessType, string> = {
 
 export const LANGUAGE_LABELS: Record<PreferredLanguage, string> = {
   en: 'English',
-  my: 'Myanmar (labels stay in simple English)',
+  my: 'မြန်မာ',
 }
 
 export const EXPENSE_CATEGORY_LABELS: Record<ExpenseCategory, string> = {
