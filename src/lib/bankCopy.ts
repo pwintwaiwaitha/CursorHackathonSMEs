@@ -3,7 +3,7 @@ import type { BilingualText } from './checkInCopy'
 export const BANK_COPY = {
   sectionTitle: { en: 'Business Banking', my: 'လုပ်ငန်းဘဏ်' },
   accountTitle: { en: 'Business Bank Account', my: 'လုပ်ငန်းဘဏ်အကောင့်' },
-  demoBankLabel: { en: 'Thiri Fashion • Demo Bank', my: 'Thiri Fashion • Demo Bank' },
+  demoBankLabel: { en: 'J Clothing • Demo Bank', my: 'J Clothing • Demo Bank' },
   demoConnected: { en: 'Demo Connected', my: 'သရုပ်ပြ ချိတ်ဆက်ပြီး' },
   demoConnection: { en: 'Demo Connection', my: 'သရုပ်ပြချိတ်ဆက်မှု' },
   demonstrationOnly: { en: 'Demonstration only', my: 'သရုပ်ပြသာ' },
@@ -13,8 +13,8 @@ export const BANK_COPY = {
     my: 'လုပ်ငန်းအကောင့်ကို ချိတ်ဆက်ပါ။ ဘဏ်လွှဲမှုများကို ငွေလည်ပတ်မှု ခန့်မှန်းချက်တွင် အလိုအလျောက် ထည့်မည်။',
   },
   consentTitle: {
-    en: 'Connect Thiri Fashion’s business account',
-    my: 'Thiri Fashion ၏ လုပ်ငန်းအကောင့်ကို ချိတ်ဆက်ရန်',
+    en: 'Connect J Clothing’s business account',
+    my: 'J Clothing ၏ လုပ်ငန်းအကောင့်ကို ချိတ်ဆက်ရန်',
   },
   consentReadBalances: { en: 'Read balances', my: 'လက်ကျန်ငွေ ဖတ်ရန်' },
   consentReadTxns: { en: 'Read transactions', my: 'ငွေလွှဲမှတ်တမ်း ဖတ်ရန်' },

@@ -43,16 +43,9 @@ export function SignUpPage() {
           />
         </div>
 
-        <p className="mt-4 text-sm text-muted">
-          Already have an account?{' '}
-          <Link to="/login" className="font-semibold text-navy underline">
-            Sign in
-          </Link>
-        </p>
         <p className="mt-2 text-sm text-muted">
-          Prefer a walkthrough first?{' '}
-          <Link to="/onboarding" className="font-semibold text-navy underline">
-            Try Thiri Fashion demo
+          <Link to="/dashboard" className="font-semibold text-navy underline">
+            Back to J Clothing demo
           </Link>
         </p>
       </div>

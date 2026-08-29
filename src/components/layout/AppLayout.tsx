@@ -1,4 +1,4 @@
-import { Navigate, Outlet } from 'react-router-dom'
+import { Outlet } from 'react-router-dom'
 import { ErrorBoundary } from '../ui/ErrorBoundary'
 import { useApp } from '../../context/useApp'
 import { DemoBanner } from '../demo/DemoBanner'
@@ -10,7 +10,7 @@ export function AppLayout() {
   const { store, isDemoMode } = useApp()
 
   if (!store.profile) {
-    return <Navigate to="/dashboard" replace />
+    return null
   }
 
   return (

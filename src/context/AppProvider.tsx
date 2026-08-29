@@ -542,9 +542,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [loadDemoBusiness])
 
   const resetAllData = useCallback(() => {
-    clearDemoModeState()
-    setDemoState({ active: false, selectedId: null })
     if (user) {
+      clearDemoModeState()
+      setDemoState({ active: false, selectedId: null })
       void loadAuthenticatedStore(user.id)
         .then((next) => {
           setStore(next)
@@ -555,17 +555,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
         })
       return
     }
-    setStore(
-      persistSideStore({
-        profile: null,
-        checkIns: [],
-        scheduledItems: [],
-        receivables: [],
-        payables: [],
-        scenarios: { ...EMPTY_SCENARIOS },
-      }),
-    )
-  }, [persistSideStore, user])
+    const nextState = ensureAnonymousDemoState()
+    setDemoState(nextState)
+    clearDemoBannerDismissed()
+    const next = buildDemoStore(OWNER_DEMO_BUSINESS_ID)
+    storage.save(next)
+    setStore(next)
+  }, [user])
 
   const exitDemoMode = useCallback(() => {
     clearDemoModeState()

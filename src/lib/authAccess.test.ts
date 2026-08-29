@@ -25,13 +25,13 @@ describe('auth routes', () => {
     expect(isAuthRequiredPath('/bank-partner-demo')).toBe(false)
   })
 
-  it('allows demo without login and blocks real protected pages when signed out', () => {
+  it('lets anonymous visitors use the app (local J Clothing demo)', () => {
     expect(
       canAccessProtectedApp({ isAuthenticated: false, isDemoMode: true }),
     ).toBe(true)
     expect(
       canAccessProtectedApp({ isAuthenticated: false, isDemoMode: false }),
-    ).toBe(false)
+    ).toBe(true)
     expect(
       canAccessProtectedApp({ isAuthenticated: true, isDemoMode: false }),
     ).toBe(true)

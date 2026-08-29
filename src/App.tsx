@@ -1,4 +1,4 @@
-import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom'
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { ProtectedRoute } from './components/auth/ProtectedRoute'
 import { AppLayout } from './components/layout/AppLayout'
 import { ErrorBoundary } from './components/ui/ErrorBoundary'
@@ -6,7 +6,6 @@ import { LoadingBlock } from './components/ui/LoadingBlock'
 import { AppProvider } from './context/AppProvider'
 import { useApp } from './context/useApp'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
-import { canAccessProtectedApp } from './lib/authAccess'
 import { ROUTES } from './lib/routes'
 import { BankPartnerDemoPage } from './pages/BankPartnerDemoPage'
 import { BankingPage } from './pages/BankingPage'
@@ -23,7 +22,7 @@ import { SettingsPage } from './pages/SettingsPage'
 import { SignUpPage } from './pages/SignUpPage'
 
 function GuardedAppLayout() {
-  const { user, loading } = useAuth()
+  const { loading } = useAuth()
   const { isDemoMode, isReady } = useApp()
 
   if (!isDemoMode && (loading || !isReady)) {
@@ -34,7 +33,6 @@ function GuardedAppLayout() {
     )
   }
 
-  void user
   return <AppLayout />
 }
 
