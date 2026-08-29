@@ -114,13 +114,14 @@ export function loadDemoModeState(): DemoModeState {
       return { ...EMPTY_DEMO_STATE }
     }
     const parsed = JSON.parse(raw) as Partial<DemoModeState>
-    const selectedId =
+    const storedId =
       typeof parsed.selectedId === 'string' && isDemoBusinessId(parsed.selectedId)
         ? parsed.selectedId
         : null
+    const active = Boolean(parsed.active) && storedId !== null
     return {
-      active: Boolean(parsed.active) && selectedId !== null,
-      selectedId,
+      active,
+      selectedId: active ? 'clothing' : null,
     }
   } catch {
     return { ...EMPTY_DEMO_STATE }

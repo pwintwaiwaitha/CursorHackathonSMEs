@@ -1,5 +1,7 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
+import { FinancialDetails } from '../components/dashboard/FinancialDetails'
+import { SegmentTabs } from '../components/ui/SegmentTabs'
 import {
   CartesianGrid,
   Legend,
@@ -18,10 +20,23 @@ import { ErrorState } from '../components/ui/ErrorState'
 import { LoadingBlock, LoadingCards } from '../components/ui/LoadingBlock'
 import { PageHeader } from '../components/ui/PageHeader'
 import { StatCard } from '../components/ui/StatCard'
+import { ForecastBankCard } from '../components/banking/ForecastBankCard'
 import { useApp } from '../context/useApp'
+import { useBanking } from '../hooks/useBanking'
 import { buildAiAdviceRequest } from '../lib/aiAdvice'
-import { buildRiskCards, historicalClosingPoints } from '../lib/dashboardData'
+import { storeWithoutMatchedManuals } from '../lib/bankMatching'
+import { assessCashFlowHealth, getCheckInForDate, getCurrentCashMmk } from '../lib/cashflow'
+import { pickLine } from '../lib/checkInCopy'
+import { DASHBOARD_COPY } from '../lib/dashboardCopy'
+import { buildRiskCards, expenseCategoryChartData, historicalClosingPoints } from '../lib/dashboardData'
+import {
+  computeCashCover,
+  computeSafeToSpend,
+  lowestIn14Days,
+} from '../lib/dashboardMetrics'
 import { formatDisplayDate, formatShortDate, todayIsoDate } from '../lib/dates'
+import { ROUTES } from '../lib/routes'
+import { totalOpenReceivablesMmk } from '../lib/schedule'
 import {
   FORECAST_LEVELS,
   listForecastLevels,
@@ -30,13 +45,38 @@ import {
   unlockExplanation,
 } from '../lib/forecastEngine'
 import { formatCompactMmk, formatMmk } from '../lib/money'
-import type { ScenarioBand } from '../types/models'
+import {
+  forecastAnalyzedLabel,
+  forecastDataAvailableLabel,
+} from '../lib/forecastCopy'
+import { CONFIDENCE_LABELS, type ScenarioBand } from '../types/models'
+import { SimulatorPage } from './SimulatorPage'
+import { ScenariosPage } from './ScenariosPage'
 
 const BANDS: ScenarioBand[] = ['optimistic', 'expected', 'pessimistic']
+type ForecastTab = 'forecast' | 'what-if' | 'scenarios'
+
+function tabFromSearch(value: string | null): ForecastTab {
+  if (value === 'what-if' || value === 'scenarios') {
+    return value
+  }
+  return 'forecast'
+}
 
 export function ForecastPage() {
   const { store, isReady, loadError, retryLoad } = useApp()
+  const banking = useBanking()
+  const [searchParams, setSearchParams] = useSearchParams()
   const today = todayIsoDate()
+  const language = store.profile?.preferredLanguage ?? 'en'
+  const tab = tabFromSearch(searchParams.get('tab'))
+  const setTab = (next: ForecastTab) => {
+    if (next === 'forecast') {
+      setSearchParams({})
+      return
+    }
+    setSearchParams({ tab: next })
+  }
   const history = measureCheckInHistory(store.checkIns, today)
   const levels = listForecastLevels(history.recordedDays)
   const firstUnlocked = levels.find((item) => item.unlocked)?.level ?? FORECAST_LEVELS[0]
@@ -65,26 +105,34 @@ export function ForecastPage() {
     )
   }
 
+  const forecastStore = storeWithoutMatchedManuals(
+    store,
+    banking.isConnected ? banking.snapshot.transactions : [],
+    store.profile?.id ?? '',
+  )
+  const sts = computeSafeToSpend(store, today)
+  const todayCheckIn = getCheckInForDate(store, today)
+
   let expected
   let optimistic
   let pessimistic
   try {
     expected = runForecast({
-      store,
+      store: forecastStore,
       level: selected,
       startDate: today,
       assumptions: store.scenarios,
       band: 'expected',
     })
     optimistic = runForecast({
-      store,
+      store: forecastStore,
       level: selected,
       startDate: today,
       assumptions: store.scenarios,
       band: 'optimistic',
     })
     pessimistic = runForecast({
-      store,
+      store: forecastStore,
       level: selected,
       startDate: today,
       assumptions: store.scenarios,
@@ -145,13 +193,61 @@ export function ForecastPage() {
     }))
 
   const risks = expected.locked ? [] : buildRiskCards(store, expected, today)
+  const health = assessCashFlowHealth(store, expected)
+  const cashCover = computeCashCover(store)
+  const lowest = lowestIn14Days(expected, history.recordedDays)
+  const expenses = expenseCategoryChartData(store)
+  const weekPoints = expected.points.slice(0, 7)
+  const flowChart = weekPoints.map((point) => ({
+    date: formatShortDate(point.date),
+    inflows: point.inflowsMmk,
+    outflows: point.outflowsMmk,
+  }))
+  const historyPoints = historicalClosingPoints(store, 14)
+  const balanceChart = [
+    ...historyPoints.map((row) => ({
+      date: formatShortDate(row.date),
+      historical: row.historical,
+      forecast: null as number | null,
+    })),
+    ...weekPoints.map((point, index) => ({
+      date: formatShortDate(point.date),
+      historical: index === 0 && historyPoints.length === 0 ? expected.startingBalanceMmk : null,
+      forecast: point.projectedBalanceMmk,
+    })),
+  ]
 
   return (
-    <div className="space-y-5">
-      <PageHeader
-        title="Cash forecast"
-        subtitle="Recorded cash is a solid line. Predicted cash is dashed. Longer views stay locked until you have enough Daily Cash Check-ins."
+    <div className="space-y-4">
+      <SegmentTabs
+        label={pickLine({ en: 'Forecast tools', my: 'ခန့်မှန်းကိရိယာ' }, language)}
+        value={tab}
+        onChange={setTab}
+        options={[
+          { id: 'forecast', label: pickLine({ en: 'Cash Forecast', my: 'ငွေခန့်မှန်း' }, language) },
+          { id: 'what-if', label: pickLine({ en: 'What-if', my: 'စမ်းကြည့်' }, language) },
+          {
+            id: 'scenarios',
+            label: pickLine({ en: 'Long-term Scenarios', my: 'ရေရှည်အစီအစဉ်' }, language),
+          },
+        ]}
       />
+
+      {tab === 'what-if' ? <SimulatorPage embedded /> : null}
+      {tab === 'scenarios' ? <ScenariosPage embedded /> : null}
+
+      {tab === 'forecast' ? (
+        <>
+      <p className="text-sm font-medium text-navy">
+        {forecastDataAvailableLabel(history.recordedDays, language)}
+      </p>
+      <p className="text-sm text-muted">
+        {forecastAnalyzedLabel(
+          history.recordedDays,
+          store.profile?.businessName ?? 'this shop',
+          language,
+        )}
+      </p>
 
       <div className="flex flex-wrap items-center gap-2">
         <span className="rounded border border-navy bg-navy px-2.5 py-1 text-xs font-semibold text-white">
@@ -214,15 +310,87 @@ export function ForecastPage() {
             title={`${selected.shortName} ${selected.family} is locked`}
             message={expected.unlockRequirement ?? unlockExplanation(selected, history.recordedDays)}
             action={
-              <Link to="/check-in" className="rounded-md bg-bank-blue px-4 py-2 text-sm font-semibold text-white">
+              <Link to={ROUTES.checkIn} className="rounded-md bg-bank-blue px-4 py-2 text-sm font-semibold text-white">
                 Add a Daily Cash Check-in
               </Link>
             }
           />
-          <AiAdvicePanel payload={null} locked />
         </>
       ) : (
         <>
+          <section className="rounded-lg border border-line bg-white p-4">
+            <h2 className="font-semibold text-navy">
+              {pickLine({ en: 'What this forecast says', my: 'ဤခန့်မှန်းချက် ပြောသည်မှာ' }, language)}
+            </h2>
+            <dl className="mt-3 grid gap-3 sm:grid-cols-2">
+              <div>
+                <dt className="text-sm text-muted">
+                  {pickLine({ en: 'Period', my: 'ကာလ' }, language)}
+                </dt>
+                <dd className="font-medium text-ink">
+                  {formatDisplayDate(expected.startDate)} – {formatDisplayDate(expected.endDate)}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-sm text-muted">
+                  {pickLine({ en: 'Lowest cash', my: 'အနိမ့်ဆုံးငွေ' }, language)}
+                </dt>
+                <dd className={`font-medium ${expected.lowestPredictedCashMmk < 0 ? 'text-risk' : 'text-ink'}`}>
+                  {formatMmk(expected.lowestPredictedCashMmk)}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-sm text-muted">
+                  {pickLine({ en: 'Shortage date', my: 'ငွေပြတ်ရက်' }, language)}
+                </dt>
+                <dd className="font-medium text-ink">
+                  {expected.shortageDate ? formatDisplayDate(expected.shortageDate) : pickLine({ en: 'None', my: 'မရှိ' }, language)}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-sm text-muted">
+                  {pickLine({ en: 'Shortage amount', my: 'ပြတ်မည့်ပမာဏ' }, language)}
+                </dt>
+                <dd className={`font-medium ${expected.shortageAmountMmk > 0 ? 'text-risk' : 'text-ink'}`}>
+                  {expected.shortageAmountMmk > 0 ? formatMmk(expected.shortageAmountMmk) : pickLine({ en: 'None', my: 'မရှိ' }, language)}
+                </dd>
+              </div>
+              <div className="sm:col-span-2">
+                <dt className="text-sm text-muted">
+                  {pickLine(DASHBOARD_COPY.oneCause, language)}
+                </dt>
+                <dd className="font-medium text-ink">
+                  {expected.mainRiskDrivers[0] ?? pickLine({ en: 'No single large cash leak found.', my: 'ကြီးသောငွေယိုစိမ့်မှု မတွေ့ရပါ။' }, language)}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-sm text-muted">
+                  {pickLine(DASHBOARD_COPY.confidence, language)}
+                </dt>
+                <dd className="font-medium text-ink">{CONFIDENCE_LABELS[expected.confidenceLevel]}</dd>
+              </div>
+              <div>
+                <dt className="text-sm text-muted">
+                  {pickLine({ en: 'Recommended action', my: 'အကြံပြုလုပ်ရန်' }, language)}
+                </dt>
+                <dd className="font-medium text-ink">
+                  {expected.recommendedActions[0] ?? expected.suggestedActions[0]}
+                </dd>
+              </div>
+            </dl>
+          </section>
+          <ForecastBankCard
+            language={language}
+            hideAmounts={false}
+            currentCashMmk={getCurrentCashMmk(store)}
+            safeToSpendMmk={sts.safeToSpendMmk}
+            todaySalesMmk={todayCheckIn?.cashSalesMmk ?? 0}
+            receivables={store.receivables}
+            payables={store.payables}
+            shortageDate={expected.shortageDate}
+            shortageAmountMmk={expected.shortageAmountMmk}
+            gapCause={sts.gapCause}
+          />
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <StatCard label="Predicted closing cash" value={expected.predictedClosingCashMmk} />
             <StatCard
@@ -246,13 +414,12 @@ export function ForecastPage() {
               hint={`${BANDS.length} scenarios: optimistic, expected, pessimistic`}
             />
           </div>
-
           <ConfidenceMeter level={expected.confidenceLevel} hint={expected.dataPeriodUsed} />
-
           <AiAdvicePanel
             locked={false}
             payload={buildAiAdviceRequest(store, expected, selected)}
           />
+
 
           <section className="rounded-lg border border-line bg-white p-4">
             <h2 className="font-semibold text-navy">
@@ -322,14 +489,25 @@ export function ForecastPage() {
               </div>
             )}
           </section>
-
+            <FinancialDetails
+              store={store}
+              language={language}
+              hideAmounts={false}
+              cashCover={cashCover}
+              lowest={lowest}
+              health={health}
+              totalReceivablesMmk={totalOpenReceivablesMmk(store.receivables)}
+              weekForecast={expected}
+              balanceChart={balanceChart}
+              flowChart={flowChart}
+              expenses={expenses}
+            />
           <section className="space-y-3">
             <h2 className="font-semibold text-navy">Risks in this view</h2>
             {risks.map((risk) => (
               <RiskCard key={risk.id} risk={risk} />
             ))}
           </section>
-
           {expected.missingDataWarnings.length > 0 ? (
             <section className="rounded-lg border border-watch bg-watch-bg p-4">
               <h2 className="font-semibold text-watch-ink">Missing-data warnings</h2>
@@ -342,6 +520,8 @@ export function ForecastPage() {
           ) : null}
         </>
       )}
+        </>
+      ) : null}
     </div>
   )
 }

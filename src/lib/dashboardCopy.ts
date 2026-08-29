@@ -129,6 +129,22 @@ export const DASHBOARD_COPY = {
   close: { en: 'Close', my: 'ပိတ်ရန်' },
   alerts: { en: 'Alerts', my: 'သတိပေးချက်' },
   reminders: { en: 'Reminder settings', my: 'သတိပေးအချိန်' },
+  bestAction: { en: 'Today’s Best Action', my: 'ယနေ့ အကောင်းဆုံးလုပ်ရန်' },
+  statusHealthy: { en: 'Healthy', my: 'ကျန်းမာ' },
+  statusWatch: { en: 'Attention', my: 'သတိထား' },
+  statusRisk: { en: 'High Risk', my: 'အန္တရာယ်မြင့်' },
+  shortageAmount: { en: 'Shortage amount', my: 'ပြတ်မည့်ပမာဏ' },
+  oneCause: { en: 'Main cause', my: 'အဓိကအကြောင်း' },
+  demoData: { en: 'Demo data', my: 'နမူနာဒေတာ' },
+  openForecast: { en: 'Open forecast', my: 'ခန့်မှန်းချက်ဖွင့်ရန်' },
+  testWhatIf: { en: 'Test a What-if Decision', my: 'What-if ဆုံးဖြတ်ချက် စမ်းရန်' },
+  viewScenarios: { en: 'View Scenarios', my: 'အစီအစဉ်များ ကြည့်ရန်' },
+  forecastOverview: { en: 'Overview', my: 'အနှစ်ချုပ်' },
+  forecastTimeline: { en: 'Timeline', my: 'အချိန်ဇယား' },
+  forecastAiPlan: { en: 'AI Plan', my: 'AI အစီအစဉ်' },
+  toCollect: { en: 'To Collect', my: 'ကောက်ခံရန်' },
+  toPay: { en: 'To Pay', my: 'ပေးရန်' },
+  calendar: { en: 'Calendar', my: 'ပြက္ခဒိန်' },
 } as const satisfies Record<string, BilingualText>
 
 export function dashLine(

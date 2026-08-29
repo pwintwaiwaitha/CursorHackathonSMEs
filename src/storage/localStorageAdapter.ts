@@ -67,10 +67,7 @@ export class LocalStorageAdapter implements StorageAdapter {
   }
 }
 
-/**
- * Swap this factory later for a Supabase adapter without changing pages.
- * Example later: `if (import.meta.env.VITE_SUPABASE_URL) return new SupabaseAdapter()`
- */
+/** Local / demo books. Signed-in non-demo users persist via supabaseRepository. */
 export function createStorageAdapter(): StorageAdapter {
   return new LocalStorageAdapter()
 }

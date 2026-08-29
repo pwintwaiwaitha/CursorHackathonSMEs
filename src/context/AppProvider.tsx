@@ -1,4 +1,5 @@
-import { useCallback, useMemo, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useAuth } from '../contexts/AuthContext'
 import { createId } from '../lib/ids'
 import {
   calculateClosingCashMmk,
@@ -7,6 +8,8 @@ import {
   resolveOperatingExpensesMmk,
 } from '../lib/checkIn'
 import { todayIsoDate } from '../lib/dates'
+import { shouldUseSupabase } from '../lib/authAccess'
+import { isUuid } from '../lib/uuid'
 import { derivePayableStatus, deriveReceivableStatus } from '../lib/schedule'
 import type {
   BusinessProfileInput,
@@ -23,8 +26,16 @@ import {
   saveDemoModeState,
   type DemoBusinessId,
 } from '../storage/demoMode'
+import { isOwnerDemoStore, OWNER_DEMO_BUSINESS_ID } from '../storage/ownerDemo'
+import { clearDemoBannerDismissed } from '../lib/uiStorage'
 import type { AppStore } from '../storage/types'
-import { EMPTY_SCENARIOS } from '../storage/types'
+import { EMPTY_SCENARIOS, emptyStore } from '../storage/types'
+import { draftsFromStore, saveUserDrafts } from '../storage/userDrafts'
+import {
+  getSupabaseRepository,
+  loadAuthenticatedStore,
+  repositoryErrorMessage,
+} from '../services/supabaseRepository'
 import type {
   Payable,
   Receivable,
@@ -36,226 +47,481 @@ import { AppContext } from './appContext'
 
 const storage = createStorageAdapter()
 
-function persist(next: AppStore): AppStore {
-  storage.save(next)
-  return next
+function nextId(prefix: string, remote: boolean): string {
+  return remote ? crypto.randomUUID() : createId(prefix)
 }
 
 export function AppProvider({ children }: { children: ReactNode }) {
-  const [store, setStore] = useState<AppStore>(() => storage.load())
+  const { user, loading: authLoading } = useAuth()
+  const [store, setStore] = useState<AppStore>(emptyStore)
   const [demoState, setDemoState] = useState(loadDemoModeState)
-  const [isReady, setIsReady] = useState(true)
+  const [isReady, setIsReady] = useState(false)
   const [loadError, setLoadError] = useState<string | null>(null)
 
-  const retryLoad = useCallback(() => {
+  const isRemote = shouldUseSupabase({
+    isAuthenticated: Boolean(user),
+    isDemoMode: demoState.active,
+  })
+  const userId = user?.id ?? null
+
+  const persistSideStore = useCallback(
+    (next: AppStore) => {
+      if (isRemote && userId) {
+        saveUserDrafts(userId, draftsFromStore(next))
+        return next
+      }
+      storage.save(next)
+      return next
+    },
+    [isRemote, userId],
+  )
+
+  const hydrate = useCallback(async () => {
     setIsReady(false)
+    setLoadError(null)
     try {
+      if (demoState.active) {
+        const stored = storage.load()
+        if (isOwnerDemoStore(stored.profile?.businessName)) {
+          setStore(stored)
+          return
+        }
+        const next = buildDemoStore(OWNER_DEMO_BUSINESS_ID)
+        storage.save(next)
+        setStore(next)
+        return
+      }
+      if (user) {
+        setStore(await loadAuthenticatedStore(user.id))
+        return
+      }
       setStore(storage.load())
-      setLoadError(null)
-    } catch {
-      setLoadError('Could not read saved shop data in this browser.')
+    } catch (error) {
+      setLoadError(repositoryErrorMessage(error))
+      setStore(emptyStore())
     } finally {
       setIsReady(true)
     }
-  }, [])
+  }, [demoState.active, user])
 
-  const saveProfile = useCallback((input: BusinessProfileInput) => {
-    setStore((current) => {
-      const now = new Date().toISOString()
-      const profile = current.profile
-        ? {
-            ...current.profile,
-            ...input,
-            currency: CURRENCY,
-            updatedAt: now,
-          }
-        : {
-            id: createId('biz'),
-            ...input,
-            currency: CURRENCY,
-            createdAt: now,
-            updatedAt: now,
-          }
-      return persist({
-        ...current,
-        profile,
-        checkIns: rechainCheckIns(current.checkIns, profile.startingCashBalanceMmk),
+  useEffect(() => {
+    if (authLoading) {
+      setIsReady(false)
+      return
+    }
+    void hydrate()
+  }, [authLoading, hydrate])
+
+  const retryLoad = useCallback(() => {
+    void hydrate()
+  }, [hydrate])
+
+  const saveProfile = useCallback(
+    (input: BusinessProfileInput) => {
+      const remote = isRemote
+      setStore((current) => {
+        const now = new Date().toISOString()
+        const profile = current.profile
+          ? {
+              ...current.profile,
+              ...input,
+              currency: CURRENCY,
+              updatedAt: now,
+            }
+          : {
+              id: nextId('biz', remote),
+              ...input,
+              currency: CURRENCY,
+              createdAt: now,
+              updatedAt: now,
+            }
+        const next = persistSideStore({
+          ...current,
+          profile,
+          checkIns: rechainCheckIns(current.checkIns, profile.startingCashBalanceMmk),
+        })
+        if (remote) {
+          void (async () => {
+            try {
+              const repo = getSupabaseRepository()
+              if (!isUuid(profile.id) || !current.profile) {
+                const created = await repo.createBusiness({
+                  ...(isUuid(profile.id) ? { id: profile.id } : {}),
+                  name: input.businessName,
+                  business_type: input.businessType,
+                  starting_cash: input.startingCashBalanceMmk,
+                  emergency_reserve: current.scenarios.emergencyCashReserveTargetMmk,
+                  currency: CURRENCY,
+                })
+                await repo.updateProfileLanguage(input.preferredLanguage)
+                setStore((cur) =>
+                  persistSideStore({
+                    ...cur,
+                    profile: cur.profile
+                      ? {
+                          ...cur.profile,
+                          id: created.id,
+                          createdAt: created.created_at,
+                          updatedAt: created.updated_at,
+                        }
+                      : cur.profile,
+                    checkIns: rechainCheckIns(
+                      cur.checkIns,
+                      cur.profile?.startingCashBalanceMmk ?? created.starting_cash,
+                    ),
+                  }),
+                )
+              } else {
+                await repo.updateBusiness(profile.id, {
+                  name: input.businessName,
+                  business_type: input.businessType,
+                  starting_cash: input.startingCashBalanceMmk,
+                  emergency_reserve: current.scenarios.emergencyCashReserveTargetMmk,
+                  currency: CURRENCY,
+                })
+                await repo.updateProfileLanguage(input.preferredLanguage)
+              }
+              setLoadError(null)
+            } catch (error) {
+              setLoadError(repositoryErrorMessage(error))
+            }
+          })()
+        }
+        return next
       })
-    })
-  }, [])
+    },
+    [isRemote, persistSideStore],
+  )
 
-  const saveCheckIn = useCallback((input: DailyCheckInInput) => {
-    setStore((current) => {
-      const starting = current.profile?.startingCashBalanceMmk ?? 0
-      const existing = current.checkIns.find((item) => item.date === input.date)
-      const withoutDate = current.checkIns.filter((item) => item.date !== input.date)
-      const openingCashMmk = getOpeningCashMmk(withoutDate, input.date, starting)
-      const operatingExpensesMmk = resolveOperatingExpensesMmk(
-        input.operatingExpensesMmk,
-        input.expenseBreakdowns,
-      )
-      const now = new Date().toISOString()
-      const record = {
-        id: existing?.id ?? createId('checkin'),
-        ...input,
-        openingCashMmk,
-        operatingExpensesMmk,
-        closingCashMmk: calculateClosingCashMmk({
+  const saveCheckIn = useCallback(
+    (input: DailyCheckInInput) => {
+      const remote = isRemote
+      setStore((current) => {
+        const starting = current.profile?.startingCashBalanceMmk ?? 0
+        const existing = current.checkIns.find((item) => item.date === input.date)
+        const withoutDate = current.checkIns.filter((item) => item.date !== input.date)
+        const openingCashMmk = getOpeningCashMmk(withoutDate, input.date, starting)
+        const operatingExpensesMmk = resolveOperatingExpensesMmk(
+          input.operatingExpensesMmk,
+          input.expenseBreakdowns,
+        )
+        const now = new Date().toISOString()
+        const record = {
+          id: existing?.id ?? nextId('checkin', remote),
+          ...input,
           openingCashMmk,
-          cashSalesMmk: input.cashSalesMmk,
-          customerDebtCollectedMmk: input.customerDebtCollectedMmk,
-          creditSalesMmk: input.creditSalesMmk,
           operatingExpensesMmk,
-          inventoryPurchasesMmk: input.inventoryPurchasesMmk,
-          supplierPaymentsMmk: input.supplierPaymentsMmk,
-          otherCashReceivedMmk: input.otherCashReceivedMmk,
-          otherCashPaidMmk: input.otherCashPaidMmk,
+          closingCashMmk: calculateClosingCashMmk({
+            openingCashMmk,
+            cashSalesMmk: input.cashSalesMmk,
+            customerDebtCollectedMmk: input.customerDebtCollectedMmk,
+            creditSalesMmk: input.creditSalesMmk,
+            operatingExpensesMmk,
+            inventoryPurchasesMmk: input.inventoryPurchasesMmk,
+            supplierPaymentsMmk: input.supplierPaymentsMmk,
+            otherCashReceivedMmk: input.otherCashReceivedMmk,
+            otherCashPaidMmk: input.otherCashPaidMmk,
+          }),
+          createdAt: existing?.createdAt ?? now,
+          updatedAt: now,
+        }
+        const next = persistSideStore({
+          ...current,
+          checkIns: rechainCheckIns([...withoutDate, record], starting),
+        })
+        if (remote && next.profile) {
+          const businessId = next.profile.id
+          void getSupabaseRepository()
+            .saveDailyCheckin(record, businessId)
+            .then((saved) => {
+              setStore((cur) =>
+                persistSideStore({
+                  ...cur,
+                  checkIns: rechainCheckIns(
+                    cur.checkIns.map((item) =>
+                      item.date === saved.date ? { ...item, ...saved } : item,
+                    ),
+                    cur.profile?.startingCashBalanceMmk ?? 0,
+                  ),
+                }),
+              )
+              setLoadError(null)
+            })
+            .catch((error: unknown) => {
+              setLoadError(repositoryErrorMessage(error))
+            })
+        }
+        return next
+      })
+    },
+    [isRemote, persistSideStore],
+  )
+
+  const deleteCheckIn = useCallback(
+    (id: string) => {
+      const remote = isRemote
+      setStore((current) => {
+        const starting = current.profile?.startingCashBalanceMmk ?? 0
+        const next = persistSideStore({
+          ...current,
+          checkIns: rechainCheckIns(
+            current.checkIns.filter((item) => item.id !== id),
+            starting,
+          ),
+        })
+        if (remote && isUuid(id) && current.profile) {
+          void getSupabaseRepository()
+            .deleteDailyCheckin(id, current.profile.id)
+            .catch((error: unknown) => {
+              setLoadError(repositoryErrorMessage(error))
+            })
+        }
+        return next
+      })
+    },
+    [isRemote, persistSideStore],
+  )
+
+  const addScheduledItem = useCallback(
+    (input: ScheduledItemInput) => {
+      setStore((current) => {
+        const item: ScheduledCashItem = { id: createId('sched'), ...input }
+        return persistSideStore({
+          ...current,
+          scheduledItems: [...current.scheduledItems, item],
+        })
+      })
+    },
+    [persistSideStore],
+  )
+
+  const removeScheduledItem = useCallback(
+    (id: string) => {
+      setStore((current) =>
+        persistSideStore({
+          ...current,
+          scheduledItems: current.scheduledItems.filter((item) => item.id !== id),
         }),
-        createdAt: existing?.createdAt ?? now,
-        updatedAt: now,
-      }
-      return persist({
-        ...current,
-        checkIns: rechainCheckIns([...withoutDate, record], starting),
+      )
+    },
+    [persistSideStore],
+  )
+
+  const addReceivable = useCallback(
+    (input: ReceivableInput) => {
+      const remote = isRemote
+      setStore((current) => {
+        const draft: Receivable = {
+          id: nextId('recv', remote),
+          ...input,
+          status: 'pending',
+        }
+        const item: Receivable = {
+          ...draft,
+          status: deriveReceivableStatus(draft, todayIsoDate()),
+        }
+        const next = persistSideStore({
+          ...current,
+          receivables: [...current.receivables, item],
+        })
+        if (remote && next.profile) {
+          const businessId = next.profile.id
+          void getSupabaseRepository()
+            .createReceivable(item, businessId)
+            .then((saved) => {
+              setStore((cur) =>
+                persistSideStore({
+                  ...cur,
+                  receivables: cur.receivables.map((row) =>
+                    row.id === item.id ? saved : row,
+                  ),
+                }),
+              )
+            })
+            .catch((error: unknown) => {
+              setLoadError(repositoryErrorMessage(error))
+            })
+        }
+        return next
       })
-    })
-  }, [])
+    },
+    [isRemote, persistSideStore],
+  )
 
-  const deleteCheckIn = useCallback((id: string) => {
-    setStore((current) => {
-      const starting = current.profile?.startingCashBalanceMmk ?? 0
-      return persist({
-        ...current,
-        checkIns: rechainCheckIns(
-          current.checkIns.filter((item) => item.id !== id),
-          starting,
-        ),
+  const updateReceivable = useCallback(
+    (item: Receivable) => {
+      const remote = isRemote
+      setStore((current) => {
+        const next = persistSideStore({
+          ...current,
+          receivables: current.receivables.map((row) =>
+            row.id === item.id ? item : row,
+          ),
+        })
+        if (remote && next.profile && isUuid(item.id)) {
+          void getSupabaseRepository()
+            .updateReceivable(item, next.profile.id)
+            .catch((error: unknown) => {
+              setLoadError(repositoryErrorMessage(error))
+            })
+        }
+        return next
       })
-    })
-  }, [])
+    },
+    [isRemote, persistSideStore],
+  )
 
-  const addScheduledItem = useCallback((input: ScheduledItemInput) => {
-    setStore((current) => {
-      const item: ScheduledCashItem = { id: createId('sched'), ...input }
-      return persist({
-        ...current,
-        scheduledItems: [...current.scheduledItems, item],
+  const removeReceivable = useCallback(
+    (id: string) => {
+      const remote = isRemote
+      setStore((current) => {
+        const next = persistSideStore({
+          ...current,
+          receivables: current.receivables.filter((item) => item.id !== id),
+        })
+        if (remote && isUuid(id) && current.profile) {
+          void getSupabaseRepository()
+            .deleteReceivable(id, current.profile.id)
+            .catch((error: unknown) => {
+              setLoadError(repositoryErrorMessage(error))
+            })
+        }
+        return next
       })
-    })
-  }, [])
+    },
+    [isRemote, persistSideStore],
+  )
 
-  const removeScheduledItem = useCallback((id: string) => {
-    setStore((current) =>
-      persist({
-        ...current,
-        scheduledItems: current.scheduledItems.filter((item) => item.id !== id),
-      }),
-    )
-  }, [])
-
-  const addReceivable = useCallback((input: ReceivableInput) => {
-    setStore((current) => {
-      const draft: Receivable = {
-        id: createId('recv'),
-        ...input,
-        status: 'pending',
-      }
-      const item: Receivable = {
-        ...draft,
-        status: deriveReceivableStatus(draft, todayIsoDate()),
-      }
-      return persist({
-        ...current,
-        receivables: [...current.receivables, item],
+  const addPayable = useCallback(
+    (input: PayableInput) => {
+      const remote = isRemote
+      setStore((current) => {
+        const draft: Payable = {
+          id: nextId('pay', remote),
+          ...input,
+          status: 'pending',
+        }
+        const item: Payable = {
+          ...draft,
+          status: derivePayableStatus(draft, todayIsoDate()),
+        }
+        const next = persistSideStore({
+          ...current,
+          payables: [...current.payables, item],
+        })
+        if (remote && next.profile) {
+          void getSupabaseRepository()
+            .createPayable(item, next.profile.id)
+            .then((saved) => {
+              setStore((cur) =>
+                persistSideStore({
+                  ...cur,
+                  payables: cur.payables.map((row) =>
+                    row.id === item.id ? { ...saved, recurrence: item.recurrence } : row,
+                  ),
+                }),
+              )
+            })
+            .catch((error: unknown) => {
+              setLoadError(repositoryErrorMessage(error))
+            })
+        }
+        return next
       })
-    })
-  }, [])
+    },
+    [isRemote, persistSideStore],
+  )
 
-  const updateReceivable = useCallback((item: Receivable) => {
-    setStore((current) =>
-      persist({
-        ...current,
-        receivables: current.receivables.map((row) =>
-          row.id === item.id ? item : row,
-        ),
-      }),
-    )
-  }, [])
-
-  const removeReceivable = useCallback((id: string) => {
-    setStore((current) =>
-      persist({
-        ...current,
-        receivables: current.receivables.filter((item) => item.id !== id),
-      }),
-    )
-  }, [])
-
-  const addPayable = useCallback((input: PayableInput) => {
-    setStore((current) => {
-      const draft: Payable = {
-        id: createId('pay'),
-        ...input,
-        status: 'pending',
-      }
-      const item: Payable = {
-        ...draft,
-        status: derivePayableStatus(draft, todayIsoDate()),
-      }
-      return persist({
-        ...current,
-        payables: [...current.payables, item],
+  const updatePayable = useCallback(
+    (item: Payable) => {
+      const remote = isRemote
+      setStore((current) => {
+        const next = persistSideStore({
+          ...current,
+          payables: current.payables.map((row) => (row.id === item.id ? item : row)),
+        })
+        if (remote && next.profile && isUuid(item.id)) {
+          void getSupabaseRepository()
+            .updatePayable(item, next.profile.id)
+            .catch((error: unknown) => {
+              setLoadError(repositoryErrorMessage(error))
+            })
+        }
+        return next
       })
-    })
-  }, [])
+    },
+    [isRemote, persistSideStore],
+  )
 
-  const updatePayable = useCallback((item: Payable) => {
-    setStore((current) =>
-      persist({
-        ...current,
-        payables: current.payables.map((row) => (row.id === item.id ? item : row)),
-      }),
-    )
-  }, [])
+  const removePayable = useCallback(
+    (id: string) => {
+      const remote = isRemote
+      setStore((current) => {
+        const next = persistSideStore({
+          ...current,
+          payables: current.payables.filter((item) => item.id !== id),
+        })
+        if (remote && isUuid(id) && current.profile) {
+          void getSupabaseRepository()
+            .deletePayable(id, current.profile.id)
+            .catch((error: unknown) => {
+              setLoadError(repositoryErrorMessage(error))
+            })
+        }
+        return next
+      })
+    },
+    [isRemote, persistSideStore],
+  )
 
-  const removePayable = useCallback((id: string) => {
-    setStore((current) =>
-      persist({
-        ...current,
-        payables: current.payables.filter((item) => item.id !== id),
-      }),
-    )
-  }, [])
+  const saveScenarios = useCallback(
+    (scenarios: ScenarioAssumptions) => {
+      setStore((current) => persistSideStore({ ...current, scenarios }))
+    },
+    [persistSideStore],
+  )
 
-  const saveScenarios = useCallback((scenarios: ScenarioAssumptions) => {
-    setStore((current) => persist({ ...current, scenarios }))
-  }, [])
-
-  const loadDemoBusiness = useCallback((id: DemoBusinessId) => {
+  const loadDemoBusiness = useCallback((_id?: DemoBusinessId) => {
+    const id = OWNER_DEMO_BUSINESS_ID
     const nextState = { active: true, selectedId: id }
     saveDemoModeState(nextState)
     setDemoState(nextState)
-    setStore(persist(buildDemoStore(id)))
+    clearDemoBannerDismissed()
+    const next = buildDemoStore(id)
+    storage.save(next)
+    setStore(next)
   }, [])
 
   const resetDemoData = useCallback(() => {
-    const current = loadDemoModeState()
-    const id = current.selectedId ?? demoState.selectedId ?? 'minimart'
-    const nextState = { active: true, selectedId: id }
+    const nextState = { active: true, selectedId: OWNER_DEMO_BUSINESS_ID }
     saveDemoModeState(nextState)
     setDemoState(nextState)
-    setStore(persist(buildDemoStore(id)))
-  }, [demoState.selectedId])
+    clearDemoBannerDismissed()
+    const next = buildDemoStore(OWNER_DEMO_BUSINESS_ID)
+    storage.save(next)
+    setStore(next)
+  }, [])
 
   const loadSampleData = useCallback(() => {
-    loadDemoBusiness('minimart')
+    loadDemoBusiness(OWNER_DEMO_BUSINESS_ID)
   }, [loadDemoBusiness])
 
   const resetAllData = useCallback(() => {
     clearDemoModeState()
     setDemoState({ active: false, selectedId: null })
+    if (user) {
+      void loadAuthenticatedStore(user.id)
+        .then((next) => {
+          setStore(next)
+          setLoadError(null)
+        })
+        .catch((error: unknown) => {
+          setLoadError(repositoryErrorMessage(error))
+        })
+      return
+    }
     setStore(
-      persist({
+      persistSideStore({
         profile: null,
         checkIns: [],
         scheduledItems: [],
@@ -264,6 +530,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
         scenarios: { ...EMPTY_SCENARIOS },
       }),
     )
+  }, [persistSideStore, user])
+
+  const exitDemoMode = useCallback(() => {
+    clearDemoModeState()
+    setDemoState({ active: false, selectedId: null })
   }, [])
 
   const value = useMemo(
@@ -290,6 +561,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       resetDemoData,
       loadSampleData,
       resetAllData,
+      exitDemoMode,
     }),
     [
       store,
@@ -314,6 +586,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       resetDemoData,
       loadSampleData,
       resetAllData,
+      exitDemoMode,
     ],
   )
 

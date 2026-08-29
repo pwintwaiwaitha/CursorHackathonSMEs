@@ -33,10 +33,11 @@ export interface AppContextValue {
   saveScenarios: (scenarios: ScenarioAssumptions) => void
   isDemoMode: boolean
   selectedDemoId: DemoBusinessId | null
-  loadDemoBusiness: (id: DemoBusinessId) => void
+  loadDemoBusiness: (id?: DemoBusinessId) => void
   resetDemoData: () => void
   loadSampleData: () => void
   resetAllData: () => void
+  exitDemoMode: () => void
 }
 
 export const AppContext = createContext<AppContextValue | null>(null)

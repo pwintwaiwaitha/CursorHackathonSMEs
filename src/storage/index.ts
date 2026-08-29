@@ -17,4 +17,12 @@ export {
   loadDemoModeState,
   saveDemoModeState,
 } from './demoMode'
+export {
+  APP_HEADER_COPY,
+  OWNER_DEMO_BUSINESS_ID,
+  OWNER_DEMO_BUSINESS_NAME,
+  OWNER_DEMO_COPY,
+  headerDisplayStrings,
+  ownerVisibleShopNames,
+} from './ownerDemo'
 export type { DemoBusinessId, DemoBusinessMeta, DemoModeState } from './demoMode'

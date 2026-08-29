@@ -1,4 +1,5 @@
 import type { AppStore } from '../storage/types'
+import type { BankTransaction } from '../types/bank'
 import type {
   CashFlowHealth,
   ForecastResult,
@@ -6,6 +7,7 @@ import type {
 } from '../types/models'
 import { getCheckInForDate, getCurrentCashMmk } from './cashBalance'
 import { checkInNetCashMmk } from './checkIn'
+import { storeWithoutMatchedManuals } from './bankMatching'
 import { todayIsoDate } from './dates'
 import {
   FORECAST_LEVELS,
@@ -51,6 +53,7 @@ export function buildForecast(
   horizonDays: number,
   assumptions: ScenarioAssumptions,
   startDate = todayIsoDate(),
+  bankTransactions: BankTransaction[] = [],
 ): ForecastResult {
   const level =
     FORECAST_LEVELS.find((item) => item.horizonDays === horizonDays) ??
@@ -62,8 +65,9 @@ export function buildForecast(
     id: `compat_${horizonDays}d`,
     label: level.label,
   }
+  const businessId = store.profile?.id ?? ''
   return runForecast({
-    store,
+    store: storeWithoutMatchedManuals(store, bankTransactions, businessId),
     level: matched,
     startDate,
     assumptions,

@@ -168,6 +168,13 @@ export function dismissDemoBanner(): void {
   localStorage.setItem(UI_KEYS.demoDismiss, '1')
 }
 
+export function clearDemoBannerDismissed(): void {
+  if (!canUseStorage()) {
+    return
+  }
+  localStorage.removeItem(UI_KEYS.demoDismiss)
+}
+
 export function loadHideAmounts(): boolean {
   if (!canUseStorage()) {
     return false

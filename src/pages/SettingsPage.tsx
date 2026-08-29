@@ -1,8 +1,13 @@
 import { useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { useAuth } from '../contexts/AuthContext'
+import { AddReserveForm } from '../components/dashboard/QuickActionForms'
 import { DemoBusinessSwitcher } from '../components/demo/DemoBusinessSwitcher'
+import { LanguageSwitch } from '../components/dashboard/LanguageSwitch'
 import { MoneyInput } from '../components/ui/MoneyInput'
-import { PageHeader } from '../components/ui/PageHeader'
+import { pickLine } from '../lib/checkInCopy'
+import { DASHBOARD_COPY } from '../lib/dashboardCopy'
+import { ROUTES } from '../lib/routes'
 import { useApp } from '../context/useApp'
 import { formatDisplayDate, todayIsoDate } from '../lib/dates'
 import { formatMmk } from '../lib/money'
@@ -29,12 +34,11 @@ export function SettingsPage() {
     saveProfile,
     addScheduledItem,
     removeScheduledItem,
-    selectedDemoId,
-    loadDemoBusiness,
-    resetDemoData,
     resetAllData,
   } = useApp()
   const navigate = useNavigate()
+  const { user, signOut } = useAuth()
+  const [signingOut, setSigningOut] = useState(false)
   const profile = store.profile
   const [profileMessage, setProfileMessage] = useState('')
   const [notifPrefs, setNotifPrefs] = useState(loadNotificationPrefs)
@@ -53,6 +57,7 @@ export function SettingsPage() {
   if (!profile) {
     return null
   }
+  const language = profile.preferredLanguage
 
   function saveBusiness(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -78,11 +83,50 @@ export function SettingsPage() {
   }
 
   return (
-    <div className="space-y-8">
-      <PageHeader
-        title="Settings"
-        subtitle="Edit the shop profile, bills, customer credit and supplier credit."
-      />
+    <div className="space-y-6">
+      <section className="rounded-lg border border-line bg-white p-4">
+        <h2 className="font-semibold text-navy">
+          {pickLine({ en: 'Account', my: 'အကောင့်' }, language)}
+        </h2>
+        {user ? (
+          <>
+            <p className="mt-2 text-sm text-muted">{user.email}</p>
+            <button
+              type="button"
+              disabled={signingOut}
+              className="mt-3 inline-flex min-h-11 items-center rounded-md border border-line px-4 font-semibold text-navy disabled:text-muted"
+              onClick={() => {
+                if (signingOut) {
+                  return
+                }
+                setSigningOut(true)
+                void signOut().finally(() => {
+                  setSigningOut(false)
+                  navigate(ROUTES.login, { replace: true })
+                })
+              }}
+            >
+              {signingOut
+                ? pickLine({ en: 'Signing out…', my: 'ထွက်နေသည်…' }, language)
+                : pickLine({ en: 'Sign out', my: 'ထွက်မည်' }, language)}
+            </button>
+          </>
+        ) : (
+          <p className="mt-2 text-sm text-muted">
+            {pickLine({ en: 'Demo mode does not need an account.', my: 'နမူနာမုဒ်တွင် အကောင့်မလိုပါ။' }, language)}{' '}
+            <Link to={ROUTES.login} className="font-semibold text-navy underline">
+              {pickLine({ en: 'Sign in', my: 'ဝင်မည်' }, language)}
+            </Link>
+          </p>
+        )}
+      </section>
+
+      <section className="rounded-lg border border-line bg-white p-4">
+        <h2 className="font-semibold text-navy">{pickLine(DASHBOARD_COPY.language, language)}</h2>
+        <div className="mt-3">
+          <LanguageSwitch />
+        </div>
+      </section>
 
       <section className="rounded-lg border border-line bg-white p-4">
         <h2 className="font-semibold text-navy">Daily reminder</h2>
@@ -212,7 +256,9 @@ export function SettingsPage() {
               ))}
             </div>
           </fieldset>
-          <p className="text-sm text-muted md:col-span-2">Currency: MMK (fixed)</p>
+          <p className="text-sm text-muted md:col-span-2">
+            {pickLine({ en: 'Currency: MMK (fixed)', my: 'ငွေကြေး: MMK (သတ်မှတ်ပြီး)' }, language)}
+          </p>
           <button
             type="submit"
             className="rounded-md bg-bank-blue px-4 py-2 font-semibold text-white"
@@ -344,50 +390,68 @@ export function SettingsPage() {
       </section>
 
       <section className="rounded-lg border border-line bg-white p-4">
-        <h2 className="font-semibold text-navy">Customer and supplier bills</h2>
+        <h2 className="font-semibold text-navy">{pickLine(DASHBOARD_COPY.emergencyReserve, language)}</h2>
+        <div className="mt-3">
+          <AddReserveForm language={language} onClose={() => undefined} />
+        </div>
+      </section>
+
+      <section className="rounded-lg border border-line bg-white p-4">
+        <h2 className="font-semibold text-navy">{pickLine(DASHBOARD_COPY.toCollect, language)}</h2>
         <p className="mt-2 text-sm text-muted">
-          Receivables, payables, the payment calendar and Myanmar reminders are on the Bills
-          page.
+          {pickLine(
+            {
+              en: 'Customer collections, supplier bills, and the calendar are on Payments.',
+              my: 'ကောက်ခံရန်၊ ပေးရန်နှင့် ပြက္ခဒိန်ကို Payments တွင် ကြည့်ပါ။',
+            },
+            language,
+          )}
         </p>
         <Link
-          to="/bills"
-          className="mt-3 inline-flex rounded-md bg-bank-blue px-4 py-2 text-sm font-semibold text-white"
+          to={ROUTES.payments}
+          className="mt-3 inline-flex min-h-11 rounded-md bg-bank-blue px-4 font-semibold text-white"
         >
-          Open receivables and payables
+          {pickLine({ en: 'Open payments', my: 'ပေးချေမှုဖွင့်ရန်' }, language)}
+        </Link>
+      </section>
+
+      <section className="rounded-lg border border-watch bg-watch-bg p-4">
+        <h2 className="font-semibold text-navy">
+          {pickLine({ en: 'Bank partner judge view', my: 'ဘဏ်မိတ်ဖက် တရားသူကြီးမြင်ကွင်း' }, language)}
+        </h2>
+        <p className="mt-2 text-sm text-watch-ink">
+          {pickLine(
+            {
+              en: 'Synthetic hackathon portfolio only. Not the owner banking page. No real money moves.',
+              my: 'hackathon သရုပ်ပြစုစုပေါင်းသာ။ ပိုင်ရှင်ဘဏ်စာမျက်နှာ မဟုတ်။ တကယ့်ငွေ မရွှေ့ပါ။',
+            },
+            language,
+          )}
+        </p>
+        <Link
+          to={ROUTES.bankPartnerDemo}
+          className="mt-3 inline-flex min-h-11 rounded-md border border-navy px-4 font-semibold text-navy"
+        >
+          {pickLine({ en: 'Open bank partner demo', my: 'ဘဏ်မိတ်ဖက် နမူနာဖွင့်ရန်' }, language)}
         </Link>
       </section>
 
       <section className="rounded-lg border border-mint bg-pale p-4">
         <h2 className="font-semibold text-navy">Demo Mode</h2>
         <p className="mt-2 text-sm text-muted">
-          Demonstration data for six Myanmar shops. Each shop unlocks a different
-          forecast family. Loading a demo replaces saved shop data in this
-          browser.
+          {pickLine(
+            {
+              en: 'Reload the sample Thiri Fashion books on this phone.',
+              my: 'ဤဖုန်းတွင် Thiri Fashion နမူနာစာရင်းကို ပြန်တင်ပါ။',
+            },
+            language,
+          )}
         </p>
-        <div className="mt-4">
-          <DemoBusinessSwitcher
-            variant="full"
-            onLoaded={() => navigate('/')}
-          />
-        </div>
         <div className="mt-4 flex flex-wrap gap-3">
+          <DemoBusinessSwitcher onLoaded={() => navigate(ROUTES.dashboard)} />
           <button
             type="button"
-            className="rounded-md bg-bank-blue-light px-4 py-2 font-semibold text-navy"
-            onClick={() => {
-              if (selectedDemoId) {
-                resetDemoData()
-              } else {
-                loadDemoBusiness('minimart')
-              }
-              navigate('/')
-            }}
-          >
-            Reset demo data
-          </button>
-          <button
-            type="button"
-            className="rounded-md border border-risk px-4 py-2 font-semibold text-risk"
+            className="inline-flex min-h-11 items-center rounded-md border border-risk px-4 font-semibold text-risk"
             onClick={() => {
               resetAllData()
               navigate('/onboarding')
