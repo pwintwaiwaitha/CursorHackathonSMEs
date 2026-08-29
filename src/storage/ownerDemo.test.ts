@@ -46,7 +46,7 @@ describe('owner demo UI', () => {
     memory.clear()
   })
 
-  it('names only Thiri Fashion in owner-facing demo copy', () => {
+  it('names only J Clothing in owner-facing demo copy', () => {
     const names = ownerVisibleShopNames()
     expect(names).toEqual([OWNER_DEMO_BUSINESS_NAME])
     const ownerText = [
@@ -70,7 +70,7 @@ describe('owner demo UI', () => {
     expect(APP_HEADER_COPY.brand).not.toContain('365d')
   })
 
-  it('normalizes stored demo selection to Thiri Fashion', () => {
+  it('normalizes stored demo selection to J Clothing', () => {
     saveDemoModeState({ active: true, selectedId: 'minimart' })
     const state = loadDemoModeState()
     expect(state.active).toBe(true)
@@ -101,7 +101,7 @@ describe('owner demo UI', () => {
       'Data available: 365 days',
     )
     expect(forecastAnalyzedLabel(history.recordedDays, OWNER_DEMO_BUSINESS_NAME, 'en')).toBe(
-      '365 days of Thiri Fashion records analyzed',
+      '365 days of J Clothing records analyzed',
     )
     expect(forecastDataAvailableLabel(history.recordedDays, 'en')).not.toContain('365d')
   })

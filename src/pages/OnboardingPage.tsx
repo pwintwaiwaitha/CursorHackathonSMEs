@@ -49,16 +49,16 @@ export function OnboardingPage() {
 
   const fieldErrors = useMemo(() => errors, [errors])
 
+  if (!user || store.profile) {
+    return <Navigate to="/dashboard" replace />
+  }
+
   if (!isReady) {
     return (
       <div className="min-h-screen bg-page px-4 py-8">
-        <LoadingBlock label="Loading… / ခေတ္တစောင့်ပါ…" />
+        <LoadingBlock label="Loading…" />
       </div>
     )
-  }
-
-  if (store.profile) {
-    return <Navigate to="/dashboard" replace />
   }
 
   function toggleCategory(category: ExpenseCategory) {

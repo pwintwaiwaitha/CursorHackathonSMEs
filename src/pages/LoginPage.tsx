@@ -60,9 +60,8 @@ export function LoginPage() {
           </Link>
         </p>
         <p className="mt-2 text-sm text-muted">
-          Or try the Thiri Fashion demo without signing in.{' '}
-          <Link to="/onboarding" className="font-semibold text-navy underline">
-            Open demo
+          <Link to="/dashboard" className="font-semibold text-navy underline">
+            Back to J Clothing demo
           </Link>
         </p>
       </div>

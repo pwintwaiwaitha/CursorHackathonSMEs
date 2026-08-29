@@ -58,7 +58,7 @@ export function BankingPage() {
         shortageDate={forecast.shortageDate}
         shortageAmountMmk={forecast.shortageAmountMmk}
         gapCause={sts.gapCause}
-        businessName={store.profile?.businessName ?? 'Thiri Fashion'}
+        businessName={store.profile?.businessName ?? 'J Clothing'}
         reserveTargetMmk={store.scenarios.emergencyCashReserveTargetMmk}
       />
     </div>
