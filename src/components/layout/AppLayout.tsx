@@ -7,10 +7,10 @@ import { BottomNav } from './BottomNav'
 import { Sidebar } from './Sidebar'
 
 export function AppLayout() {
-  const { store } = useApp()
+  const { store, isDemoMode } = useApp()
 
   if (!store.profile) {
-    return <Navigate to="/onboarding" replace />
+    return <Navigate to="/dashboard" replace />
   }
 
   return (

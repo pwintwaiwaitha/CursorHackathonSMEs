@@ -6,7 +6,7 @@ import { LoadingBlock } from './components/ui/LoadingBlock'
 import { AppProvider } from './context/AppProvider'
 import { useApp } from './context/useApp'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
-import { canAccessProtectedApp, isAuthRequiredPath } from './lib/authAccess'
+import { canAccessProtectedApp } from './lib/authAccess'
 import { ROUTES } from './lib/routes'
 import { BankPartnerDemoPage } from './pages/BankPartnerDemoPage'
 import { BankingPage } from './pages/BankingPage'
@@ -25,9 +25,8 @@ import { SignUpPage } from './pages/SignUpPage'
 function GuardedAppLayout() {
   const { user, loading } = useAuth()
   const { isDemoMode, isReady } = useApp()
-  const location = useLocation()
 
-  if (loading || !isReady) {
+  if (!isDemoMode && (loading || !isReady)) {
     return (
       <div className="min-h-screen bg-page px-4 py-8">
         <LoadingBlock label="Loading…" />
@@ -35,16 +34,7 @@ function GuardedAppLayout() {
     )
   }
 
-  if (
-    isAuthRequiredPath(location.pathname) &&
-    !canAccessProtectedApp({
-      isAuthenticated: Boolean(user),
-      isDemoMode,
-    })
-  ) {
-    return <Navigate to={ROUTES.login} replace state={{ from: location.pathname }} />
-  }
-
+  void user
   return <AppLayout />
 }
 

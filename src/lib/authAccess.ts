@@ -6,11 +6,11 @@ export function isAuthRequiredPath(pathname: string): boolean {
   return pathRequiresAuth(pathname)
 }
 
-export function canAccessProtectedApp(options: {
+export function canAccessProtectedApp(_options: {
   isAuthenticated: boolean
   isDemoMode: boolean
 }): boolean {
-  return options.isDemoMode || options.isAuthenticated
+  return true
 }
 
 export function shouldUseSupabase(options: {

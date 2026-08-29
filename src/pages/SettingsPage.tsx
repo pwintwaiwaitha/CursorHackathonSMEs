@@ -8,6 +8,7 @@ import { MoneyInput } from '../components/ui/MoneyInput'
 import { pickLine } from '../lib/checkInCopy'
 import { DASHBOARD_COPY } from '../lib/dashboardCopy'
 import { ROUTES } from '../lib/routes'
+import { OWNER_DEMO_COPY } from '../storage/ownerDemo'
 import { useApp } from '../context/useApp'
 import { formatDisplayDate, todayIsoDate } from '../lib/dates'
 import { formatMmk } from '../lib/money'
@@ -102,7 +103,7 @@ export function SettingsPage() {
                 setSigningOut(true)
                 void signOut().finally(() => {
                   setSigningOut(false)
-                  navigate(ROUTES.login, { replace: true })
+                  navigate(ROUTES.dashboard, { replace: true })
                 })
               }}
             >
@@ -115,7 +116,7 @@ export function SettingsPage() {
           <p className="mt-2 text-sm text-muted">
             {pickLine({ en: 'Demo mode does not need an account.', my: 'နမူနာမုဒ်တွင် အကောင့်မလိုပါ။' }, language)}{' '}
             <Link to={ROUTES.login} className="font-semibold text-navy underline">
-              {pickLine({ en: 'Sign in', my: 'ဝင်မည်' }, language)}
+              {pickLine(OWNER_DEMO_COPY.signInToSync, language)}
             </Link>
           </p>
         )}
@@ -441,8 +442,8 @@ export function SettingsPage() {
         <p className="mt-2 text-sm text-muted">
           {pickLine(
             {
-              en: 'Reload the sample Thiri Fashion books on this phone.',
-              my: 'ဤဖုန်းတွင် Thiri Fashion နမူနာစာရင်းကို ပြန်တင်ပါ။',
+              en: 'Reload the sample J Clothing books on this phone.',
+              my: 'ဤဖုန်းတွင် J Clothing နမူနာစာရင်းကို ပြန်တင်ပါ။',
             },
             language,
           )}
@@ -454,7 +455,7 @@ export function SettingsPage() {
             className="inline-flex min-h-11 items-center rounded-md border border-risk px-4 font-semibold text-risk"
             onClick={() => {
               resetAllData()
-              navigate('/onboarding')
+              navigate(ROUTES.dashboard)
             }}
           >
             Reset all data

@@ -38,6 +38,26 @@ export function getSupabaseConfigError(): string | null {
   return config.ok ? null : config.error
 }
 
+export function hasCachedSupabaseSession(): boolean {
+  if (typeof localStorage === 'undefined') {
+    return false
+  }
+  try {
+    for (let i = 0; i < localStorage.length; i += 1) {
+      const key = localStorage.key(i)
+      if (key && key.startsWith('sb-') && key.includes('auth-token')) {
+        const raw = localStorage.getItem(key)
+        if (raw && raw.includes('access_token')) {
+          return true
+        }
+      }
+    }
+  } catch {
+    return false
+  }
+  return false
+}
+
 let client: SupabaseClient<Database> | null = null
 
 export function getSupabaseClient(): SupabaseClient<Database> {

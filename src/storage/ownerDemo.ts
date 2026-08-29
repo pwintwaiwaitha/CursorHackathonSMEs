@@ -1,7 +1,8 @@
-import type { DemoBusinessId } from './demoMode'
+import { saveDemoModeState, type DemoBusinessId } from './demoMode'
 
 export const OWNER_DEMO_BUSINESS_ID: DemoBusinessId = 'clothing'
-export const OWNER_DEMO_BUSINESS_NAME = 'Thiri Fashion'
+export const OWNER_DEMO_BUSINESS_NAME = 'J Clothing'
+export const LEGACY_OWNER_DEMO_NAMES = ['Thiri Fashion'] as const
 
 export const APP_HEADER_COPY = {
   brand: 'SME MATE AI',
@@ -10,16 +11,20 @@ export const APP_HEADER_COPY = {
 
 export const OWNER_DEMO_COPY = {
   reset: {
-    en: 'Reset Thiri Fashion demo',
-    my: 'Thiri Fashion နမူနာ ပြန်စရန်',
+    en: 'Reset J Clothing Demo',
+    my: 'J Clothing နမူနာ ပြန်စရန်',
   },
   tryDemo: {
-    en: 'Try Thiri Fashion demo',
-    my: 'Thiri Fashion နမူနာ စမ်းရန်',
+    en: 'Try J Clothing demo',
+    my: 'J Clothing နမူနာ စမ်းရန်',
   },
   banner: {
-    en: 'Demo Mode — Sample Thiri Fashion data',
-    my: 'နမူနာမုဒ် — Thiri Fashion နမူနာဒေတာ',
+    en: 'Demo Mode — Try changing J Clothing’s records',
+    my: 'နမူနာမုဒ် — J Clothing စာရင်းကို ပြင်ကြည့်ပါ',
+  },
+  signInToSync: {
+    en: 'Sign in to sync data',
+    my: 'ဒေတာချိတ်ဆက်ရန် ဝင်မည်',
   },
 } as const
 
@@ -47,5 +52,14 @@ export function headerDisplayStrings(businessName: string, isDemo: boolean): str
 }
 
 export function isOwnerDemoStore(businessName: string | undefined): boolean {
-  return businessName === OWNER_DEMO_BUSINESS_NAME
+  return (
+    businessName === OWNER_DEMO_BUSINESS_NAME ||
+    LEGACY_OWNER_DEMO_NAMES.some((name) => name === businessName)
+  )
+}
+
+export function ensureAnonymousDemoState(): { active: true; selectedId: DemoBusinessId } {
+  const next = { active: true as const, selectedId: OWNER_DEMO_BUSINESS_ID }
+  saveDemoModeState(next)
+  return next
 }

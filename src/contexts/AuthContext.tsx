@@ -17,6 +17,7 @@ import {
 import {
   getSupabaseClient,
   getSupabaseConfigError,
+  hasCachedSupabaseSession,
   isSupabaseConfigured,
 } from '../lib/supabase'
 import { getSupabaseRepository } from '../services/supabaseRepository'
@@ -48,7 +49,9 @@ async function ensureProfile(user: User): Promise<void> {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [session, setSession] = useState<Session | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(
+    () => isSupabaseConfigured() && hasCachedSupabaseSession(),
+  )
   const configError = getSupabaseConfigError()
 
   useEffect(() => {

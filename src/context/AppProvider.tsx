@@ -26,7 +26,13 @@ import {
   saveDemoModeState,
   type DemoBusinessId,
 } from '../storage/demoMode'
-import { isOwnerDemoStore, OWNER_DEMO_BUSINESS_ID } from '../storage/ownerDemo'
+import {
+  ensureAnonymousDemoState,
+  isOwnerDemoStore,
+  OWNER_DEMO_BUSINESS_ID,
+  OWNER_DEMO_BUSINESS_NAME,
+} from '../storage/ownerDemo'
+import { hasCachedSupabaseSession } from '../lib/supabase'
 import { clearDemoBannerDismissed } from '../lib/uiStorage'
 import type { AppStore } from '../storage/types'
 import { EMPTY_SCENARIOS, emptyStore } from '../storage/types'
@@ -51,11 +57,33 @@ function nextId(prefix: string, remote: boolean): string {
   return remote ? crypto.randomUUID() : createId(prefix)
 }
 
+function loadOrBuildOwnerDemo(): AppStore {
+  const stored = storage.load()
+  if (isOwnerDemoStore(stored.profile?.businessName) && stored.profile) {
+    if (stored.profile.businessName !== OWNER_DEMO_BUSINESS_NAME) {
+      const renamed = {
+        ...stored,
+        profile: { ...stored.profile, businessName: OWNER_DEMO_BUSINESS_NAME },
+      }
+      storage.save(renamed)
+      return renamed
+    }
+    return stored
+  }
+  const next = buildDemoStore(OWNER_DEMO_BUSINESS_ID)
+  storage.save(next)
+  return next
+}
+
 export function AppProvider({ children }: { children: ReactNode }) {
   const { user, loading: authLoading } = useAuth()
-  const [store, setStore] = useState<AppStore>(emptyStore)
-  const [demoState, setDemoState] = useState(loadDemoModeState)
-  const [isReady, setIsReady] = useState(false)
+  const [demoState, setDemoState] = useState(() =>
+    hasCachedSupabaseSession() ? loadDemoModeState() : ensureAnonymousDemoState(),
+  )
+  const [store, setStore] = useState<AppStore>(() =>
+    hasCachedSupabaseSession() ? emptyStore() : loadOrBuildOwnerDemo(),
+  )
+  const [isReady, setIsReady] = useState(() => !hasCachedSupabaseSession())
   const [loadError, setLoadError] = useState<string | null>(null)
 
   const isRemote = shouldUseSupabase({
@@ -105,12 +133,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [demoState.active, user])
 
   useEffect(() => {
-    if (authLoading) {
+    if (authLoading && hasCachedSupabaseSession()) {
       setIsReady(false)
       return
     }
+    if (!user && !demoState.active) {
+      const next = ensureAnonymousDemoState()
+      setDemoState(next)
+      setStore(loadOrBuildOwnerDemo())
+      setIsReady(true)
+      return
+    }
     void hydrate()
-  }, [authLoading, hydrate])
+  }, [authLoading, hydrate, user, demoState.active])
 
   const retryLoad = useCallback(() => {
     void hydrate()

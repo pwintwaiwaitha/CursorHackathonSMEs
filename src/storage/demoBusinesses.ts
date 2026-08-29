@@ -682,7 +682,7 @@ function buildClothing(asOf: string): AppStore {
 
   return {
     profile: profile(id, asOf, {
-      businessName: 'Thiri Fashion',
+      businessName: 'J Clothing',
       businessType: 'shop',
       startingCashBalanceMmk,
       averageMonthlySalesMmk: 6_800_000,
